@@ -116,9 +116,10 @@ export default function SendTxModal() {
         calls: [
           {
             dest: destination.toLowerCase() as Hex,
-            value:
-              BigInt(parseEther(userInputAmount)) /
-              (BigInt(Math.trunc(price.ethereum.usd * 100)) / BigInt(100)), // 100 is the price precision
+            value: convertEthToWei(userInputAmount),
+            // value:
+            //   BigInt(parseEther(userInputAmount)) /
+            //   (BigInt(Math.trunc(price.ethereum.usd * 100)) / BigInt(100)), // 100 is the price precision
             data: emptyHex,
           },
         ],
@@ -126,8 +127,11 @@ export default function SendTxModal() {
         maxPriorityFeePerGas: maxPriorityFeePerGas as bigint,
         keyId: me?.keyId as Hex,
       });
+      debugger
       const hash = await smartWallet.sendUserOperation({ userOp });
+      debugger
       const receipt = await smartWallet.waitForUserOperationReceipt({ hash });
+      debugger
       setTxReceipt(receipt);
     } catch (e: any) {
       console.error(e);
@@ -137,6 +141,10 @@ export default function SendTxModal() {
       refreshBalance();
     }
   };
+
+  const convertEthToWei = (eth: string) => {
+    return BigInt(parseEther(eth));
+  }
 
   if (isLoading)
     return (
@@ -249,7 +257,7 @@ export default function SendTxModal() {
                   <Flex direction="column" gap="2">
                     <TextField.Root>
                       <TextField.Slot style={{ color: "var(--accent-11)", paddingLeft: "1rem" }}>
-                        USD:
+                        ETH:
                       </TextField.Slot>
                       <TextField.Input
                         required
@@ -283,7 +291,7 @@ export default function SendTxModal() {
                       style={{ paddingInline: "0.5rem", alignSelf: "flex-end" }}
                       color="gray"
                     >
-                      ${balance.toString().slice(0, 4)} available
+                     Available: <strong>{balance.toString().slice(0, 6)} ETH </strong>
                     </Text>
                   </Flex>
                 </Flex>

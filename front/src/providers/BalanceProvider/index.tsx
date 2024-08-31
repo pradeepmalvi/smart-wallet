@@ -15,7 +15,7 @@ function useBalanceHook() {
   const getBalanceUSD = useCallback(async (address: Hex) => {
     const res = await getBalance(address);
     const priceData = await fetch("/api/price?ids=ethereum&currencies=usd");
-    const price: number = Math.trunc((await priceData.json()).ethereum.usd * 100);
+    const price: number = 100 // Math.trunc((await priceData.json()).ethereum.usd * 100);
     const balance = formatEther((BigInt(res.balance) * BigInt(price)) / BigInt(100));
     setBalance(balance);
   }, []);

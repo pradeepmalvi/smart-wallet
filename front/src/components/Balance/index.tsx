@@ -15,10 +15,10 @@ export default function Balance() {
   return (
     <Flex style={css} direction="row" justify="center">
       <Text highContrast={true} weight="bold" size="9">
-        ${intBalance}
+        {intBalance}.{(decimals || "00").slice(0, 4)}
       </Text>
       <Text highContrast={true} weight="bold" size="6" style={{ color: "var(--accent-12)" }}>
-        .{(decimals || "00").slice(0, 2)}
+       ETH
       </Text>
     </Flex>
   );
