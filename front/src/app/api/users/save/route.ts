@@ -12,18 +12,18 @@ export async function POST(req: Request) {
     chain: CHAIN,
     transport,
   });
-
+  
   const user = await PUBLIC_CLIENT.readContract({
     address: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS as Hex,
     abi: FACTORY_ABI,
     functionName: "getUser",
     args: [BigInt(id)],
   });
-
+  
   if (user.account !== zeroAddress) {
-    return Response.json(undefined);
+    return Response?.json({ error: "User already exists" });
   }
-
+  
   await walletClient.writeContract({
     address: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS as Hex,
     abi: FACTORY_ABI,
@@ -42,12 +42,12 @@ export async function POST(req: Request) {
     to: smartWalletAddress,
     value: BigInt(1),
   });
-
+  
   const createdUser = {
     id,
     account: smartWalletAddress,
     pubKey,
   };
-
+  
   return Response.json(createdUser);
 }
