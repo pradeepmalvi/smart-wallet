@@ -1,6 +1,6 @@
 "use client";
 
-import { Chain, EstimateFeesPerGasReturnType, Hash, Hex, parseEther } from "viem";
+import { Chain, EstimateFeesPerGasReturnType, Hash, Hex, parseEther, parseUnits } from "viem";
 import { smartWallet } from "@/libs/smart-wallet";
 import { useEffect, useRef, useState } from "react";
 import { Flex, Link, Button, Heading, Text, TextField, Callout } from "@radix-ui/themes";
@@ -17,10 +17,12 @@ import Spinner from "../Spinner";
 import { MAINNET_PUBLIC_CLIENT } from "@/constants";
 import { normalize } from "viem/ens";
 
+  
+
 smartWallet.init();
 const builder = new UserOpBuilder(smartWallet.client.chain as Chain);
 
-export default function SendTxModal() {
+export default function SendERC20TxModal({type, token, symbol}) {
   const [txReceipt, setTxReceipt] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<any>(null);
@@ -111,21 +113,16 @@ export default function SendTxModal() {
       ).json();
       const { maxFeePerGas, maxPriorityFeePerGas }: EstimateFeesPerGasReturnType =
         await smartWallet.client.estimateFeesPerGas();
-
       const userOp = await builder.buildUserOp({
-        calls: [
-          {
-            dest: destination.toLowerCase() as Hex,
-            value: convertEthToWei(userInputAmount),
-            // value:
-            //   BigInt(parseEther(userInputAmount)) /
-            //   (BigInt(Math.trunc(price.ethereum.usd * 100)) / BigInt(100)), // 100 is the price precision
-            data: emptyHex,
-          },
-        ],
+        calls: {
+          token: token,
+          to: destination.toLowerCase() as Hex, 
+          amount: parseUnits(userInputAmount, symbol === "MT" ? 18 : 6),
+        },
         maxFeePerGas: maxFeePerGas as bigint,
         maxPriorityFeePerGas: maxPriorityFeePerGas as bigint,
         keyId: me?.keyId as Hex,
+        transferType: type,
       });
       const hash = await smartWallet.sendUserOperation({ userOp });
       const receipt = await smartWallet.waitForUserOperationReceipt({ hash });
@@ -137,10 +134,6 @@ export default function SendTxModal() {
       setIsLoading(false);
       refreshBalance();
     }
-  };
-
-  const convertEthToWei = (eth: string) => {
-    return BigInt(parseEther(eth));
   };
 
   if (isLoading)
@@ -253,8 +246,8 @@ export default function SendTxModal() {
                 <Flex direction="column" gap="1">
                   <Flex direction="column" gap="2">
                     <TextField.Root>
-                    <TextField.Slot style={{ color: "var(--accent-11)", paddingLeft: "1rem" }}>
-                        ETH:
+                      <TextField.Slot style={{ color: "var(--accent-11)", paddingLeft: "1rem" }}>
+                        {symbol}
                       </TextField.Slot>
                       <TextField.Input
                         required
@@ -262,7 +255,7 @@ export default function SendTxModal() {
                         type="number"
                         inputMode="decimal"
                         min={0}
-                        max={balance?.toString() || 0}
+                        // max={balance?.toString() || 0}
                         size={"3"}
                         step={0.01}
                         value={userInputAmount}
@@ -283,13 +276,13 @@ export default function SendTxModal() {
                       </TextField.Slot>
                     </TextField.Root>
 
-                    <Text
+                    {/* <Text
                       size="2"
                       style={{ paddingInline: "0.5rem", alignSelf: "flex-end" }}
                       color="gray"
                     >
                       Available: <strong>{balance.toString().slice(0, 6)} ETH </strong>
-                    </Text>
+                    </Text> */}
                   </Flex>
                 </Flex>
               </div>

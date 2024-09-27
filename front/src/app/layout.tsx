@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-      <link rel="apple-app-site-association file" type="text" href="https://smart-wallet-beryl.vercel.app/.well-known/apple-app-site-association"></link>
+      <link rel="apple-app-site-association file" type="text" href="/.well-known/apple-app-site-association"></link>
       </head>
       <body>
         <MeProvider>

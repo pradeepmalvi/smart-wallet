@@ -10,6 +10,7 @@ import {WebAuthn} from "src/WebAuthn.sol";
 import "openzeppelin-contracts/contracts/interfaces/IERC1271.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 struct Signature {
     bytes authenticatorData;
@@ -194,5 +195,14 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271 {
         address newImplementation
     ) internal view override onlySelf {
         (newImplementation); // No-op; silence unused parameter warning
+    }
+
+    /// Transfer ERC20 tokens
+    function transferERC20(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyEntryPoint {
+        require(IERC20(token).transfer(to, amount), "Transfer failed");
     }
 }

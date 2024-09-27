@@ -19,7 +19,6 @@ export default function Home() {
       <Flex direction="column" width="100%" justify={"between"}>
         <Flex direction="column" width="100%">
           <TopBar />
-          <Balance />
           <NavBar />
         </Flex>
         <History />

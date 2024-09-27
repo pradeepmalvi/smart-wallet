@@ -56,6 +56,7 @@ export class UserOpBuilder {
     maxFeePerGas,
     maxPriorityFeePerGas,
     keyId,
+    transferType,
   }: {
     calls: Call[];
     maxFeePerGas: bigint;
@@ -81,8 +82,17 @@ export class UserOpBuilder {
     // calculate nonce
     const nonce = await this._getNonce(account);
 
-    // create callData
-    const callData = this._addCallData(calls);
+    let callData;
+    if (transferType === "ERC20") {
+      // create callData
+      callData = this._addTransferERC20Data(
+        calls.token, // Example: USDC contract address on Ethereum
+        calls.to, // Example: Recipient's address
+        calls.amount,
+      );
+    } else {
+      callData = this._addCallData(calls);
+    }
 
     // create user operation
     const userOp: UserOperation = {
@@ -270,6 +280,39 @@ export class UserOpBuilder {
       ],
       functionName: "executeBatch",
       args: [calls],
+    });
+  }
+
+  private _addTransferERC20Data(token: string, to: string, amount: BigNumber): Hex {
+    debugger
+    return encodeFunctionData({
+      abi: [
+        {
+          inputs: [
+            {
+              internalType: "address",
+              name: "token",
+              type: "address",
+            },
+            {
+              internalType: "address",
+              name: "to",
+              type: "address",
+            },
+            {
+              internalType: "uint256",
+              name: "amount",
+              type: "uint256",
+            },
+          ],
+          name: "transferERC20",
+          outputs: [],
+          stateMutability: "nonpayable",
+          type: "function",
+        },
+      ],
+      functionName: "transferERC20",
+      args: [token, to, amount],
     });
   }
 
