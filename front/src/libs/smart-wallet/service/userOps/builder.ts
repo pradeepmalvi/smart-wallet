@@ -45,8 +45,10 @@ export class UserOpBuilder {
     this.factoryContract = getContract({
       address: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS as Hex, // only on Sepolia
       abi: FACTORY_ABI,
-      walletClient,
-      publicClient: this.publicClient,
+      client: {
+        wallet: walletClient,
+        public: this.publicClient,
+      },
     });
   }
 
@@ -284,7 +286,7 @@ export class UserOpBuilder {
   }
 
   private _addTransferERC20Data(token: string, to: string, amount: BigNumber): Hex {
-    debugger
+
     return encodeFunctionData({
       abi: [
         {
@@ -330,7 +332,9 @@ export class UserOpBuilder {
     const entryPointContract = getContract({
       address: this.entryPoint,
       abi: ENTRYPOINT_ABI,
-      publicClient: this.publicClient,
+      client: {
+        public: this.publicClient,
+      },
     });
 
     const userOpHash = entryPointContract.read.getUserOpHash([userOp]);

@@ -2,8 +2,8 @@
 
 import React, { useContext } from "react";
 import { useSmartWalletHook } from "@/libs/smart-wallet/hook/useSmartWalletHook";
-import { WagmiConfig, configureChains, createConfig } from "wagmi";
-import { publicProvider } from "wagmi/providers/public";
+import { WagmiConfig, createConfig, http } from "wagmi";
+import { mainnet, sepolia, polygonAmoy } from 'wagmi/chains'
 import { CHAIN } from "@/constants";
 
 type UseSmartWallet = ReturnType<typeof useSmartWalletHook>;
@@ -20,15 +20,25 @@ export const useWalletConnect = (): UseSmartWallet => {
 export function SmartWalletProvider({ children }: { children: React.ReactNode }) {
   const smartWalletValue = useSmartWalletHook();
 
-  const { publicClient } = configureChains([CHAIN], [publicProvider()]);
+  // const { publicClient } = configureChains([CHAIN], [publicProvider()]);
 
-  const wagmiConfig = createConfig({
-    autoConnect: true,
-    publicClient: publicClient,
-  });
+  const config = createConfig({
+    chains: [mainnet, sepolia, polygonAmoy], 
+    transports: { 
+      [mainnet.id]: http(), 
+      [sepolia.id]: http(), 
+      [polygonAmoy.id]: http(), 
+    }, 
+  })
+
+
+  // const wagmiConfig = createConfig({
+  //   autoConnect: true,
+  //   publicClient: publicClient,
+  // });
 
   return (
-    <WagmiConfig config={wagmiConfig}>
+    <WagmiConfig config={config}>
       <SmartWalletContext.Provider value={smartWalletValue}>{children}</SmartWalletContext.Provider>
     </WagmiConfig>
   );

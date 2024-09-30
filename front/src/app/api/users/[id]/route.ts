@@ -21,7 +21,7 @@ export async function GET(_req: Request, { params }: { params: { id: Hex } }) {
   // Using etherscan api instead of getBalance as Sepolia rcp node is not inconsistent
   if (user?.account) {
     const result = await fetch(
-      `https://api-sepolia.etherscan.io/api?module=account&action=balance&address=${user.account}&tag=latest&apikey=${process.env.ETHERSCAN_API_KEY}`,
+      `https://api-amoy.polygonscan.com/api?module=account&action=balance&address=${user.account}&tag=latest&apikey=${process.env.ETHERSCAN_API_KEY}`,
       { cache: "no-store" },
     );
     const resultJSON = await result.json();
