@@ -28,7 +28,7 @@ export default function NavBar() {
         Send ETH
         <PaperPlaneIcon />
       </Button>
-      <TokenBalance token={process.env.NEXT_PUBLIC_MT_TOKEN_ADDRESS} />
+      <TokenBalance token={process.env.NEXT_PUBLIC_MPT_TOKEN_ADDRESS} />
       <Button
         size="3"
         variant="outline"
@@ -37,7 +37,7 @@ export default function NavBar() {
           display: "flex",
           alignItems: "center",
         }}
-        onClick={() => open(<SendERC20TxModal type="ERC20" token={process.env.NEXT_PUBLIC_MT_TOKEN_ADDRESS} symbol="MT"/>)}
+        onClick={() => open(<SendERC20TxModal type="ERC20" token={process.env.NEXT_PUBLIC_MPT_TOKEN_ADDRESS} symbol="MT"/>)}
       >
         Send MT
         <PaperPlaneIcon />
