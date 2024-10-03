@@ -5,7 +5,6 @@ import { useModal } from "@/providers/ModalProvider";
 import { PaperPlaneIcon, CornersIcon } from "@radix-ui/react-icons";
 import QrReaderModal from "../QrReaderModal";
 import SendTxModal from "../SendTxModal";
-import SendERC20TxModal from "../SendERC20TxModal";
 import Balance from "../Balance";
 import TokenBalance from "../TokenBalance";
 
@@ -29,36 +28,7 @@ export default function NavBar() {
         <PaperPlaneIcon />
       </Button>
       <TokenBalance token={process.env.NEXT_PUBLIC_MPT_TOKEN_ADDRESS} />
-      <Button
-        size="3"
-        variant="outline"
-        style={{
-          flexGrow: 1,
-          display: "flex",
-          alignItems: "center",
-        }}
-        onClick={() => open(<SendERC20TxModal type="ERC20" token={process.env.NEXT_PUBLIC_MPT_TOKEN_ADDRESS} symbol="MT"/>)}
-      >
-        Send MT
-        <PaperPlaneIcon />
-      </Button>
-
-      <TokenBalance
-        token={process.env.NEXT_PUBLIC_USDT_TOKEN_ADDRESS}
-      />
-      <Button
-        size="3"
-        variant="outline"
-        style={{
-          flexGrow: 1,
-          display: "flex",
-          alignItems: "center",
-        }}
-        onClick={() => open(<SendERC20TxModal type="ERC20" token={process.env.NEXT_PUBLIC_USDT_TOKEN_ADDRESS} symbol="USDT"/>)}
-      >
-        Send USDT
-        <PaperPlaneIcon />
-      </Button>
+      <TokenBalance token={process.env.NEXT_PUBLIC_LINK_TOKEN_ADDRESS} />
       <Button
         size="3"
         variant="outline"
