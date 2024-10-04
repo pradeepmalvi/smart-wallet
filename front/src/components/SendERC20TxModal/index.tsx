@@ -22,7 +22,17 @@ import { normalize } from "viem/ens";
 smartWallet.init();
 const builder = new UserOpBuilder(smartWallet.client.chain as Chain);
 
-export default function SendERC20TxModal({type, token, symbol}) {
+export default function SendERC20TxModal({
+  type,
+  token,
+  symbol,
+  decimal,
+}: {
+  type: string;
+  token: string;
+  symbol: string;
+  decimal: number;
+}) {
   const [txReceipt, setTxReceipt] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<any>(null);
@@ -115,9 +125,9 @@ export default function SendERC20TxModal({type, token, symbol}) {
         await smartWallet.client.estimateFeesPerGas();
       const userOp = await builder.buildUserOp({
         calls: {
-          token: token,
+          token: token as string,
           to: destination.toLowerCase() as Hex, 
-          amount: parseUnits(userInputAmount, symbol === "MT" ? 18 : 6),
+          amount: parseUnits(userInputAmount, decimal),
         },
         maxFeePerGas: maxFeePerGas as bigint,
         maxPriorityFeePerGas: maxPriorityFeePerGas as bigint,

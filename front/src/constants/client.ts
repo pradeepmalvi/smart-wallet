@@ -1,14 +1,14 @@
 import { createPublicClient, http } from "viem";
-import { sepolia, mainnet } from "viem/chains";
+import { sepolia, mainnet, polygonAmoy } from "viem/chains";
 
 export const CHAIN = {
-  ...sepolia,
+  ...polygonAmoy,
 };
 
 export const transport = http(process.env.NEXT_PUBLIC_RPC_ENDPOINT);
 
 export const PUBLIC_CLIENT = createPublicClient({
-  chain: sepolia,
+  chain: polygonAmoy,
   transport,
 });
 

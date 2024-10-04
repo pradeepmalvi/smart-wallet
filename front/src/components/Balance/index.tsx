@@ -21,7 +21,7 @@ export default function Balance() {
           {intBalance}.{(decimals || "00").slice(0, 4)}
         </Text>
         <Text highContrast={true} weight="bold" size="6" style={{ color: "var(--accent-12)" }}>
-          ETH
+          MATIC
         </Text>
       </Flex>
   );
