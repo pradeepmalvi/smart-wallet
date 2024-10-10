@@ -1,6 +1,6 @@
 import { useMe } from "@/providers/MeProvider";
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
-import { Button, Flex, Link, TextField, IconButton, Text } from "@radix-ui/themes";
+import { Button, Flex, Link, TextField, IconButton, Text, Select } from "@radix-ui/themes";
 import { useState } from "react";
 import ThemeButton from "../ThemeButton";
 import LogoAnimated from "../LogoAnimated";
@@ -11,6 +11,10 @@ export default function OnBoarding() {
   const [username, setUsername] = useState("");
   const { create, get, returning, isLoading } = useMe();
   const [createForm, setCreateForm] = useState(!returning);
+
+  const onSelectChain = (value: string) => {
+    localStorage.setItem("chain", value);
+  }
 
   return (
     <Flex
@@ -59,6 +63,20 @@ export default function OnBoarding() {
               width: "240px",
             }}
           />
+          {
+            <Flex gap={"2"} style={{ width: "250px" }}>
+              <Select.Root defaultValue={localStorage.getItem('chain') || "Ethererum"} onValueChange={(value) => onSelectChain(value)}>
+                <Select.Trigger style={{ width: "250px" }} />
+                <Select.Content style={{ width: "250px" }}>
+                  <Select.Group style={{ width: "250px" }}>
+                    <Select.Label>Networks</Select.Label>
+                    <Select.Item value="Ethereum">Ethereum Sepolia</Select.Item>
+                    <Select.Item value="Polygon">Polygon Amoy</Select.Item>
+                  </Select.Group>
+                </Select.Content>
+              </Select.Root>
+            </Flex>
+          }
           {createForm && (
             <Flex gap={"2"} style={{ width: "250px" }}>
               <TextField.Input

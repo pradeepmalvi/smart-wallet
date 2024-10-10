@@ -7,6 +7,7 @@ import LogoAnimatedLight from "../LogoAnimatedLight";
 
 export default function History() {
   const { me } = useMe();
+  const chain = localStorage.getItem("chain");
 
   return (
     <Callout.Root style={{ marginTop: "var(--space-4)" }}>
@@ -21,10 +22,11 @@ export default function History() {
           variant="outline"
           style={{ marginTop: ".3rem" }}
           onClick={() => {
-            window.open(`https://sepolia.etherscan.io/address/${me?.account}`, "_blank");
+            if(chain === "Ethereum") window.open(`https://sepolia.etherscan.io/address/${me?.account}`, "_blank");
+            if(chain === "Polygon") window.open(`https://amoy.polygonscan.com/address/${me?.account}`, "_blank");
           }}
         >
-          Browse history on etherscan
+          Browse history on {chain === "Ethereum" ? "Etherscan" : "Polygonscan"}
           <ArrowRightIcon />
         </Button>
       </Flex>

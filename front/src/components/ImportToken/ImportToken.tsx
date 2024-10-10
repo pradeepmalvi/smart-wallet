@@ -4,8 +4,6 @@ import { Chain, EstimateFeesPerGasReturnType, Hash, Hex, parseEther } from "viem
 import { smartWallet } from "@/libs/smart-wallet";
 import { useEffect, useRef, useState } from "react";
 import { Flex, Link, Button, Heading, Text, TextField, Callout } from "@radix-ui/themes";
-import { UserOpBuilder, emptyHex } from "@/libs/smart-wallet/service/userOps";
-import { useBalance } from "@/providers/BalanceProvider";
 import {
   CheckCircledIcon,
   CrossCircledIcon,
@@ -17,10 +15,10 @@ import Spinner from "../Spinner";
 import { MAINNET_PUBLIC_CLIENT } from "@/constants";
 import { normalize } from "viem/ens";
 
-smartWallet.init(localStorage.getItem('chain') as string);
-const builder = new UserOpBuilder(smartWallet!.client!.chain as Chain);
+smartWallet.init(localStorage.getItem("chain") as string);
 
-export default function SendTxModal({ symbol }: { symbol: string }) {
+
+export default function ImportToken() {
   const [txReceipt, setTxReceipt] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<any>(null);
@@ -30,7 +28,6 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
   const [ensIsLoading, setEnsIsLoading] = useState(false);
   const [destination, setDestination] = useState("");
   const { me } = useMe();
-  const { balance, refreshBalance } = useBalance();
 
   const addressInputRef = useRef<HTMLInputElement>(null);
 
@@ -49,18 +46,6 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
     setDestination("");
     setUserInputDestination(value);
     resolveUserInputDestination(value);
-  }
-
-  function handleUserInputAmount(e: any) {
-    const value = e.target.value;
-    const amount = Number(value);
-    if ((amount > Number(balance) && value !== "") || value === "") {
-      setIsBelowBalance(false);
-    }
-    if (amount <= Number(balance) && value !== "") {
-      setIsBelowBalance(true);
-    }
-    setUserInputAmount(value);
   }
 
   async function resolveUserInputDestination(value: string) {
@@ -100,47 +85,53 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
     setDestination("");
   }
 
-  const submitTx = async (e: any) => {
-    setIsLoading(true);
-    setError(null);
+  const importToken = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const value = userInputDestination;
 
-    try {
-      const price: { ethereum: { usd: number } } = await (
-        await fetch("/api/price?ids=ethereum&currencies=usd")
-      ).json();
-      const { maxFeePerGas, maxPriorityFeePerGas }: EstimateFeesPerGasReturnType =
-        await smartWallet!.client!.estimateFeesPerGas();
+    if (!value) {
+      return;
+    }
 
-      const userOp = await builder.buildUserOp({
-        calls: [
+    const userAddresses = JSON.parse(localStorage.getItem("userAddresses") || "[]");
+
+    if (!userAddresses?.length) {
+      const userAddress = {
+        address: me?.account,
+        tokenAddresses: [
           {
-            dest: destination.toLowerCase() as Hex,
-            value: convertEthToWei(userInputAmount),
-            // value:
-            //   BigInt(parseEther(userInputAmount)) /
-            //   (BigInt(Math.trunc(price.ethereum.usd * 100)) / BigInt(100)), // 100 is the price precision
-            data: emptyHex,
+            network: localStorage.getItem("chain"),
+            token: value,
           },
         ],
-        maxFeePerGas: maxFeePerGas as bigint,
-        maxPriorityFeePerGas: maxPriorityFeePerGas as bigint,
-        keyId: me?.keyId as Hex
-      });
-      const hash = await smartWallet.sendUserOperation({ userOp });
-      const receipt = await smartWallet.waitForUserOperationReceipt({ hash });
-      setTxReceipt(receipt);
-    } catch (e: any) {
-      console.error(e);
-      setError(e.message);
-    } finally {
-      setIsLoading(false);
-      refreshBalance();
+      };
+      userAddresses.push(userAddress);
+    } else {
+      const userAddress = userAddresses.find((address: { address: string; tokenAddresses: { network: string | null; token: string; }[] }) => address.address === me?.account);
+      if (userAddress) {
+        const token = userAddress.tokenAddresses.find((token: { network: string | null; token: string }) => token.token === value);
+        if (!token) {
+          userAddress.tokenAddresses.push({
+            network: localStorage.getItem("chain"),
+            token: value,
+          });
+        }
+      } else {
+        const userAddress = {
+          address: me?.account,
+          tokenAddresses: [
+            {
+              network: localStorage.getItem("chain"),
+              token: value,
+            },
+          ],
+        };
+        userAddresses.push(userAddress);
+      }
     }
-  };
-
-  const convertEthToWei = (eth: string) => {
-    return BigInt(parseEther(eth));
+    
+    localStorage.setItem("userAddresses", JSON.stringify(userAddresses) );
+    window.location.reload();
   };
 
   if (isLoading)
@@ -151,15 +142,6 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
       </Flex>
     );
 
-  const chain = localStorage.getItem("chain");
-  let link = `https://sepolia.etherscan.io/tx/${txReceipt?.receipt?.transactionHash}`;
-
-  if (chain === "Ethereum") {
-    link = `https://sepolia.etherscan.io/tx/${txReceipt?.receipt?.transactionHash}`;
-  } else {
-    link = `https://amoy.polygonscan.com/tx/${txReceipt?.receipt?.transactionHash}`;
-  }
-
   if (txReceipt && !isLoading)
     return (
       <>
@@ -167,7 +149,11 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
           {true ? (
             <>
               <CheckCircledIcon height="32" width="100%" color="var(--teal-11)" />
-              <Link href={link} target="_blank" style={{ textDecoration: "none" }}>
+              <Link
+                href={`https://sepolia.etherscan.io/tx/${txReceipt?.receipt?.transactionHash}`}
+                target="_blank"
+                style={{ textDecoration: "none" }}
+              >
                 <Flex direction="row" gap="2">
                   <Text size="2">See transaction</Text>
                   <ExternalLinkIcon style={{ alignSelf: "center", color: "var(--teal-11)" }} />
@@ -177,7 +163,11 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
           ) : (
             <>
               <CrossCircledIcon height="32" width="100%" />
-              <Link href={link} target="_blank" style={{ textDecoration: "none" }}>
+              <Link
+                href={`https://sepolia.etherscan.io/tx/${txReceipt?.receipt?.transactionHash}`}
+                target="_blank"
+                style={{ textDecoration: "none" }}
+              >
                 <Flex direction="row" gap="2" style={{ color: "var(--gray-12)" }}>
                   <Text size="2">Transaction reverted</Text>
                   <ExternalLinkIcon style={{ alignSelf: "center" }} />
@@ -193,7 +183,7 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
     <Flex direction="column" style={{ flexGrow: 1, width: "100%" }} gap="5">
       {!txReceipt && !isLoading && (
         <Heading as="h2" size={"8"} style={{ color: "var(--accent-9)" }}>
-          Send transaction
+          Import Token
         </Heading>
       )}
       {!txReceipt && !isLoading && (
@@ -205,7 +195,7 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
             width: "100%",
             flexGrow: 1,
           }}
-          onSubmit={async (e) => await submitTx(e)}
+          onSubmit={(e) => importToken(e)}
         >
           <Flex direction="column">
             <Flex direction="column">
@@ -219,82 +209,16 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
 
                   <TextField.Root>
                     <TextField.Slot style={{ color: "var(--accent-11)", paddingLeft: "1rem" }}>
-                      To:
+                      Token:
                     </TextField.Slot>
                     <TextField.Input
                       ref={addressInputRef}
                       required
-                      pattern="0x[a-fA-F0-9]{40}|[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*\.eth"
-                      title="an ethereum address or a valid ENS name"
-                      placeholder="ENS or address"
-                      size={"3"}
+                      placeholder="Token contract address"
                       value={userInputDestination}
                       onChange={handleUserInputDestination}
                     />
-                    <TextField.Slot style={{ color: "var(--accent-11)" }}>
-                      {!destination && ensIsLoading && (
-                        <Spinner style={{ margin: 0, width: 20, height: 20 }} />
-                      )}
-                      {destination && (
-                        <CheckCircledIcon height="20" width="20" color="var(--accent-11)" />
-                      )}
-                      {!destination && !ensIsLoading && (
-                        <CrossCircledIcon
-                          height="20"
-                          width="20"
-                          color="var(--teal-11)"
-                          style={{ visibility: "hidden" }}
-                        />
-                      )}
-                    </TextField.Slot>
                   </TextField.Root>
-                </Flex>
-              </div>
-              <div>
-                <Flex direction="column" gap="1">
-                  <Flex direction="column" gap="2">
-                    <TextField.Root>
-                      <TextField.Slot style={{ color: "var(--accent-11)", paddingLeft: "1rem" }}>
-                        {symbol}:
-                      </TextField.Slot>
-                      <TextField.Input
-                        required
-                        placeholder="0.00"
-                        type="number"
-                        inputMode="decimal"
-                        min={0}
-                        max={balance?.toString() || 0}
-                        size={"3"}
-                        step={0.01}
-                        value={userInputAmount}
-                        onChange={handleUserInputAmount}
-                      />
-                      <TextField.Slot style={{ color: "var(--accent-11)" }}>
-                        {isBelowBalance && (
-                          <CheckCircledIcon height="20" width="20" color="var(--accent-11)" />
-                        )}
-                        {!isBelowBalance && (
-                          <CrossCircledIcon
-                            height="20"
-                            width="20"
-                            color="var(--teal-11)"
-                            style={{ visibility: "hidden" }}
-                          />
-                        )}
-                      </TextField.Slot>
-                    </TextField.Root>
-
-                    <Text
-                      size="2"
-                      style={{ paddingInline: "0.5rem", alignSelf: "flex-end" }}
-                      color="gray"
-                    >
-                      Available:{" "}
-                      <strong>
-                        {balance.toString().slice(0, 6)} {symbol}{" "}
-                      </strong>
-                    </Text>
-                  </Flex>
                 </Flex>
               </div>
             </Flex>
@@ -312,7 +236,7 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
               </Callout.Root>
             )}
             <Button variant="outline" size="3" type="submit">
-              SEND
+              IMPORT TOKEN
             </Button>
           </Flex>
         </form>

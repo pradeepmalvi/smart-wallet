@@ -17,12 +17,10 @@ import Spinner from "../Spinner";
 import { MAINNET_PUBLIC_CLIENT } from "@/constants";
 import { normalize } from "viem/ens";
 
-  
+smartWallet.init(localStorage.getItem("chain") as string);
+const builder = new UserOpBuilder(smartWallet!.client!.chain as Chain);
 
-smartWallet.init();
-const builder = new UserOpBuilder(smartWallet.client.chain as Chain);
-
-export default function SendERC20TxModal({
+export default function SendTokenTxModal({
   type,
   token,
   symbol,
@@ -122,11 +120,11 @@ export default function SendERC20TxModal({
         await fetch("/api/price?ids=ethereum&currencies=usd")
       ).json();
       const { maxFeePerGas, maxPriorityFeePerGas }: EstimateFeesPerGasReturnType =
-        await smartWallet.client.estimateFeesPerGas();
+        await smartWallet!.client!.estimateFeesPerGas();
       const userOp = await builder.buildUserOp({
         calls: {
-          token: token as string,
-          to: destination.toLowerCase() as Hex, 
+          token: token as Hex,
+          to: destination.toLowerCase() as Hex,
           amount: parseUnits(userInputAmount, decimal),
         },
         maxFeePerGas: maxFeePerGas as bigint,
@@ -154,6 +152,15 @@ export default function SendERC20TxModal({
       </Flex>
     );
 
+  const chain = localStorage.getItem("chain");
+  let link = `https://sepolia.etherscan.io/tx/${txReceipt?.receipt?.transactionHash}`;
+
+  if (chain === "Ethereum") {
+    link = `https://sepolia.etherscan.io/tx/${txReceipt?.receipt?.transactionHash}`;
+  } else {
+    link = `https://amoy.polygonscan.com/tx/${txReceipt?.receipt?.transactionHash}`;
+  }
+
   if (txReceipt && !isLoading)
     return (
       <>
@@ -161,11 +168,7 @@ export default function SendERC20TxModal({
           {true ? (
             <>
               <CheckCircledIcon height="32" width="100%" color="var(--teal-11)" />
-              <Link
-                href={`https://sepolia.etherscan.io/tx/${txReceipt?.receipt?.transactionHash}`}
-                target="_blank"
-                style={{ textDecoration: "none" }}
-              >
+              <Link href={link} target="_blank" style={{ textDecoration: "none" }}>
                 <Flex direction="row" gap="2">
                   <Text size="2">See transaction</Text>
                   <ExternalLinkIcon style={{ alignSelf: "center", color: "var(--teal-11)" }} />
@@ -175,11 +178,7 @@ export default function SendERC20TxModal({
           ) : (
             <>
               <CrossCircledIcon height="32" width="100%" />
-              <Link
-                href={`https://sepolia.etherscan.io/tx/${txReceipt?.receipt?.transactionHash}`}
-                target="_blank"
-                style={{ textDecoration: "none" }}
-              >
+              <Link href={link} target="_blank" style={{ textDecoration: "none" }}>
                 <Flex direction="row" gap="2" style={{ color: "var(--gray-12)" }}>
                   <Text size="2">Transaction reverted</Text>
                   <ExternalLinkIcon style={{ alignSelf: "center" }} />
