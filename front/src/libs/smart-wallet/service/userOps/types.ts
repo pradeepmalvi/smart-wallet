@@ -1,10 +1,16 @@
 import { Address, Hash, Hex } from "viem";
 import { PartialBy } from "viem/types/utils";
 
-export type Call = {
+export type NativeCall = {
   dest: Address;
   value: bigint;
   data: Hex;
+};
+
+export type TokenCall = {
+  token: Address;
+  to: Address;
+  amount: bigint;
 };
 
 export type UserOperation = {

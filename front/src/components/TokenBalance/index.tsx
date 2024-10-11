@@ -1,24 +1,26 @@
 "use client";
 
+import React, { useState, useEffect, CSSProperties } from "react";
 import { useBalance } from "@/providers/BalanceProvider";
 import { useMe } from "@/providers/MeProvider";
-import { PaperPlaneIcon } from "@radix-ui/react-icons";
+import { PaperPlaneIcon, Cross2Icon } from "@radix-ui/react-icons";
 import { Flex, Text, Button } from "@radix-ui/themes";
-import { CSSProperties } from "react";
-import React, { useState, useEffect } from "react";
 import { createPublicClient, http } from "viem";
 import { mainnet, sepolia, polygonAmoy } from "viem/chains";
 import { formatUnits } from "viem/utils";
-import SendERC20TxModal from "../SendERC20TxModal";
 import { useModal } from "@/providers/ModalProvider";
+import SendTokenTxModal from "../SendERC20TxModal";
 
 const css: CSSProperties = {
   padding: "1rem 0",
 };
 
 const client = createPublicClient({
-  chain: polygonAmoy,
-  transport: http(process.env.NEXT_PUBLIC_RPC_ENDPOINT),
+  chain: localStorage.getItem("chain") === "Ethereum" ? sepolia : polygonAmoy,
+  transport:
+    localStorage.getItem("chain") === "Ethereum"
+      ? http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM)
+      : http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_POLYGON),
 });
 
 const ERC20_ABI = [
@@ -263,19 +265,19 @@ const TokenBalance = ({ token }: TokenBalanceProps) => {
       }
 
       const decimals = await client.readContract({
-        address: tokenContractAddress,
+        address: tokenContractAddress as `0x${string}`,
         abi: ERC20_ABI,
         functionName: "decimals",
       });
 
       const symbol = await client.readContract({
-        address: tokenContractAddress,
+        address: tokenContractAddress as `0x${string}`,
         abi: ERC20_ABI,
         functionName: "symbol",
       });
 
       const balance = await client.readContract({
-        address: tokenContractAddress,
+        address: tokenContractAddress as `0x${string}`,
         abi: ERC20_ABI,
         functionName: "balanceOf",
         args: [smartContractWalletAddress],
@@ -285,11 +287,26 @@ const TokenBalance = ({ token }: TokenBalanceProps) => {
 
       setTokenBalance(tokenBalance);
       setTokenSymbol(symbol as string);
-      setTokenDecimal(decimals as number)
+      setTokenDecimal(decimals as number);
     };
 
     fetchTokenBalance();
   }, []);
+
+  const removeToken = () => {
+    
+    const userAddresses = JSON.parse(localStorage.getItem("userAddresses") || "[]");
+    const updatedUserAddresses = userAddresses.map((userAddress: { address: string; tokenAddresses: { token: string }[] }) => {
+      return me && userAddress.address === me.account
+        ? {
+            ...userAddress,
+            tokenAddresses: userAddress.tokenAddresses.filter((tokenAddress) => tokenAddress.token !== token),
+          }
+        : userAddress;
+    });
+    localStorage.setItem("userAddresses", JSON.stringify(updatedUserAddresses));
+    window.location.reload();
+  };
 
   return (
     <>
@@ -302,21 +319,43 @@ const TokenBalance = ({ token }: TokenBalanceProps) => {
         </Text>
       </Flex>
 
-      <Button
-        size="3"
-        variant="outline"
-        style={{
-          flexGrow: 1,
-          display: "flex",
-          alignItems: "center",
-        }}
-        onClick={() => {
-          open(<SendERC20TxModal type="ERC20" token={token} symbol={tokenSymbol} decimal={tokenDecimal}/>);
-        }}
-      >
-        Send {tokenSymbol}
-        <PaperPlaneIcon />
-      </Button>
+      <Flex style={{ marginBottom: "20px" }}>
+        <Button
+          size="3"
+          variant="outline"
+          style={{
+            flexGrow: 10000,
+            display: "flex",
+            alignItems: "center",
+          }}
+          onClick={() => {
+            open(
+              <SendTokenTxModal
+                type="Token"
+                token={token}
+                symbol={tokenSymbol}
+                decimal={tokenDecimal}
+              />,
+            );
+          }}
+        >
+          Send {tokenSymbol}
+          <PaperPlaneIcon />
+        </Button>
+        <Button
+          size="3"
+          variant="outline"
+          style={{
+            flexGrow: 1,
+            display: "flex",
+            alignItems: "center",
+            marginLeft: "1rem",
+          }}
+          onClick={removeToken}
+        >
+          <Cross2Icon/>
+        </Button>
+      </Flex>
     </>
   );
 };

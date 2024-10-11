@@ -4,6 +4,8 @@ import Address from "../Address";
 import Link from "next/link";
 
 export default function TopBar() {
+  const chain = localStorage.getItem("chain");
+
   return (
     <Flex width="100%" justify="between" align="center" style={{ position: "relative" }}>
       <Flex gap="2" align={"center"}>
@@ -19,7 +21,7 @@ export default function TopBar() {
         size="1"
         style={{ color: "var(--gray-6)", position: "absolute", top: "2.5rem", left: "1.1rem" }}
       >
-        on Sepolia testnet
+        on {chain === "Ethereum" ? "Sepolia Ethereum" : "Amoy Polygon"} testnet
       </Text>
     </Flex>
   );

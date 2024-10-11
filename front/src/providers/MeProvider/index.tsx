@@ -38,6 +38,7 @@ function useMeHook() {
       const user = await saveUser({
         id: credential.rawId,
         pubKey: credential.pubKey,
+        chain: localStorage.getItem("chain") as string
       });
 
       const me = {
@@ -69,8 +70,9 @@ function useMeHook() {
       if (!credential) {
         return;
       }
-      const user = await getUser(credential.rawId);
 
+      const user = await getUser(credential.rawId, localStorage.getItem("chain") as string);
+      
       if (user?.account === undefined || user?.account === zeroAddress) {
         throw new Error("user not found");
       }

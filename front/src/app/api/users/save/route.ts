@@ -1,20 +1,23 @@
-import { CHAIN, PUBLIC_CLIENT, transport } from "@/constants";
+import { getChainFromLocalStorage, getPublicClient, getTransportFromLocalStorage} from "@/constants";
 import { FACTORY_ABI } from "@/constants/factory";
 import { Hex, createWalletClient, toHex, zeroAddress } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
 export async function POST(req: Request) {
-  const { id, pubKey } = (await req.json()) as { id: Hex; pubKey: [Hex, Hex] };
+  const { id, pubKey, chain } = (await req.json()) as { id: Hex; pubKey: [Hex, Hex], chain: string };
 
-  const account = privateKeyToAccount(process.env.RELAYER_PRIVATE_KEY as Hex);
+  const privateKey =  chain === "Ethereum" ? process.env.RELAYER_PRIVATE_KEY_ETHEREUM : process.env.RELAYER_PRIVATE_KEY_POLYGON;
+  const factoryContract =  chain === "Ethereum" ? process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_ETHEREUM : process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_POLYGON;
+
+  const account = privateKeyToAccount(privateKey as Hex);
   const walletClient = createWalletClient({
     account,
-    chain: CHAIN,
-    transport,
+    chain: getChainFromLocalStorage(chain),
+    transport: getTransportFromLocalStorage(chain),
   });
   
-  const user = await PUBLIC_CLIENT.readContract({
-    address: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS as Hex,
+  const user = await getPublicClient(chain).readContract({
+    address: factoryContract as Hex,
     abi: FACTORY_ABI,
     functionName: "getUser",
     args: [BigInt(id)],
@@ -25,14 +28,14 @@ export async function POST(req: Request) {
   }
   
   await walletClient.writeContract({
-    address: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS as Hex,
+    address: factoryContract as Hex,
     abi: FACTORY_ABI,
     functionName: "saveUser",
     args: [BigInt(id), pubKey],
   });
 
-  const smartWalletAddress = await PUBLIC_CLIENT.readContract({
-    address: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS as Hex,
+  const smartWalletAddress = await getPublicClient(chain).readContract({
+    address: factoryContract as Hex,
     abi: FACTORY_ABI,
     functionName: "getAddress",
     args: [pubKey],

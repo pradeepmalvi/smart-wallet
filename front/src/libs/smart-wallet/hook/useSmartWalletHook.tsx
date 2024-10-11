@@ -6,14 +6,14 @@ export function useSmartWalletHook() {
   const [address, setAddress] = useState<Hash | null>(null);
 
   async function init(address: Hash) {
-    smartWallet.init();
+    smartWallet.init(localStorage.getItem("chain") as string);
     setAddress(address);
   }
 
   useEffect(() => {
     if (!address) return;
 
-    smartWallet.client.watchEvent({
+    smartWallet!.client!.watchEvent({
       address: address,
       onLogs: (logs: any) => {},
     });

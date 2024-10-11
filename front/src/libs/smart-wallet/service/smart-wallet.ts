@@ -11,8 +11,9 @@ import {
 import { SmartWalletActions, smartWalletActions } from "./decorators";
 import { transport } from "../config";
 import { ERC4337RpcSchema, UserOperationAsHex } from "@/libs/smart-wallet/service/userOps";
-import { CHAIN } from "@/constants";
+import { getChainFromLocalStorage, getTransportFromLocalStorage } from "@/constants";
 import { EstimateUserOperationGasReturnType } from "@/libs/smart-wallet/service/actions";
+import { get } from "http";
 
 export type SmartWalletClient<chain extends Chain | undefined = Chain | undefined> = Client<
   Transport,
@@ -34,17 +35,18 @@ export const createSmartWalletClient = (parameters: PublicClientConfig): SmartWa
 };
 
 class SmartWallet {
-  private _client: SmartWalletClient;
+  private _client?: SmartWalletClient
   private _isInitiated: boolean = false;
 
   constructor() {
-    this._client = createSmartWalletClient({
-      chain: CHAIN,
-      transport,
-    });
+
   }
 
-  public init() {
+  public init(chain: string) {
+    this._client = createSmartWalletClient({
+      chain: getChainFromLocalStorage(chain),
+      transport: getTransportFromLocalStorage(chain),
+    });
     this._isInitiated = true;
   }
 
@@ -57,7 +59,7 @@ class SmartWallet {
 
   public async sendUserOperation(args: { userOp: UserOperationAsHex }): Promise<`0x${string}`> {
     this._isInit();
-    return await this._client.sendUserOperation({
+    return await this._client!.sendUserOperation({
       ...args,
     });
   }
@@ -66,28 +68,28 @@ class SmartWallet {
     userOp: UserOperationAsHex;
   }): Promise<EstimateUserOperationGasReturnType> {
     this._isInit();
-    return await this._client.estimateUserOperationGas({
+    return await this._client!.estimateUserOperationGas({
       ...args,
     });
   }
 
   public async getUserOperationReceipt(args: { hash: Hash }): Promise<`0x${string}`> {
     this._isInit();
-    return await this._client.getUserOperationReceipt({
+    return await this._client!.getUserOperationReceipt({
       ...args,
     });
   }
 
   public async getIsValidSignature(args: any): Promise<boolean> {
     this._isInit();
-    return await this._client.getIsValidSignature({
+    return await this._client!.getIsValidSignature({
       ...args,
     });
   }
 
   public async waitForUserOperationReceipt(args: any): Promise<any> {
     this._isInit();
-    return await this._client.waitForUserOperationReceipt({
+    return await this._client!.waitForUserOperationReceipt({
       ...args,
     });
   }

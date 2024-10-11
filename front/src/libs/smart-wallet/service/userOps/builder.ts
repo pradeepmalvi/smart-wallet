@@ -2,8 +2,8 @@ import {
   Chain,
   GetContractReturnType,
   Hex,
+  Client,
   PublicClient,
-  WalletClient,
   createPublicClient,
   createWalletClient,
   encodeFunctionData,
@@ -16,10 +16,21 @@ import {
   Address,
   zeroAddress,
 } from "viem";
-import { UserOperationAsHex, UserOperation, Call } from "@/libs/smart-wallet/service/userOps/types";
+import {
+  UserOperationAsHex,
+  UserOperation,
+  NativeCall,
+  TokenCall,
+} from "@/libs/smart-wallet/service/userOps/types";
 import { DEFAULT_USER_OP } from "@/libs/smart-wallet/service/userOps/constants";
 import { P256Credential, WebAuthn } from "@/libs/web-authn";
-import { ENTRYPOINT_ABI, ENTRYPOINT_ADDRESS, FACTORY_ABI } from "@/constants";
+import {
+  ENTRYPOINT_ABI,
+  ENTRYPOINT_ADDRESS,
+  FACTORY_ABI,
+  getChainFromLocalStorage,
+  getTransportFromLocalStorage,
+} from "@/constants";
 import { smartWallet } from "@/libs/smart-wallet";
 
 export class UserOpBuilder {
@@ -27,23 +38,30 @@ export class UserOpBuilder {
   public entryPoint: Hex = ENTRYPOINT_ADDRESS;
   public chain: Chain;
   public publicClient: PublicClient;
-  public factoryContract: GetContractReturnType<typeof FACTORY_ABI, WalletClient, PublicClient>;
+  public factoryContract: GetContractReturnType<typeof FACTORY_ABI, Client>;
 
   constructor(chain: Chain) {
     this.chain = chain;
+
+    const selectedChain = localStorage.getItem("chain");
+    const factoryContractAddress =
+      selectedChain === "Ethereum"
+        ? process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_ETHEREUM
+        : process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_POLYGON;
+
     this.publicClient = createPublicClient({
-      chain,
-      transport: http(),
+      chain: getChainFromLocalStorage(selectedChain as String),
+      transport: getTransportFromLocalStorage(selectedChain as String),
     });
 
     const walletClient = createWalletClient({
       account: this.relayer,
-      chain,
-      transport: http(),
+      chain: getChainFromLocalStorage(selectedChain as String),
+      transport: getTransportFromLocalStorage(selectedChain as String),
     });
 
     this.factoryContract = getContract({
-      address: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS as Hex, // only on Sepolia
+      address: factoryContractAddress as Hex, // only on Sepolia
       abi: FACTORY_ABI,
       client: {
         wallet: walletClient,
@@ -60,14 +78,14 @@ export class UserOpBuilder {
     keyId,
     transferType,
   }: {
-    calls: Call[];
+    calls: NativeCall[] | TokenCall;
     maxFeePerGas: bigint;
     maxPriorityFeePerGas: bigint;
     keyId: Hex;
+    transferType?: string;
   }): Promise<UserOperationAsHex> {
     // calculate smart wallet address via Factory contract to know the sender
     const { account, publicKey } = await this._calculateSmartWalletAddress(keyId); // the keyId is the id tied to the user's public key
-
     // get bytecode
     const bytecode = await this.publicClient.getBytecode({
       address: account,
@@ -85,15 +103,10 @@ export class UserOpBuilder {
     const nonce = await this._getNonce(account);
 
     let callData;
-    if (transferType === "ERC20") {
-      // create callData
-      callData = this._addTransferERC20Data(
-        calls.token, // Example: USDC contract address on Ethereum
-        calls.to, // Example: Recipient's address
-        calls.amount,
-      );
+    if (transferType === "Token" && !Array.isArray(calls)) {
+      callData = this._addCallTokenData(calls as TokenCall);
     } else {
-      callData = this._addCallData(calls);
+      callData = this._addCallData(calls as NativeCall[]);
     }
 
     // create user operation
@@ -246,7 +259,7 @@ export class UserOpBuilder {
     return { account: user.account, publicKey: user.publicKey };
   }
 
-  private _addCallData(calls: Call[]): Hex {
+  private _addCallData(calls: NativeCall[]): Hex {
     return encodeFunctionData({
       abi: [
         {
@@ -285,8 +298,7 @@ export class UserOpBuilder {
     });
   }
 
-  private _addTransferERC20Data(token: string, to: string, amount: BigNumber): Hex {
-
+  private _addCallTokenData(calls: TokenCall): Hex {
     return encodeFunctionData({
       abi: [
         {
@@ -314,7 +326,7 @@ export class UserOpBuilder {
         },
       ],
       functionName: "transferERC20",
-      args: [token, to, amount],
+      args: [calls.token, calls.to, calls.amount],
     });
   }
 
