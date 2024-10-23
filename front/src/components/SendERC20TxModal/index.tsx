@@ -153,12 +153,14 @@ export default function SendTokenTxModal({
     );
 
   const chain = localStorage.getItem("chain");
-  let link = `https://sepolia.etherscan.io/tx/${txReceipt?.receipt?.transactionHash}`;
+  let link = `${process.env.NEXT_PUBLIC_ETHERSCAN_URL_ETHEREUM}/tx/${txReceipt?.receipt?.transactionHash}`;
 
   if (chain === "Ethereum") {
-    link = `https://sepolia.etherscan.io/tx/${txReceipt?.receipt?.transactionHash}`;
-  } else {
-    link = `https://amoy.polygonscan.com/tx/${txReceipt?.receipt?.transactionHash}`;
+    link = `${process.env.NEXT_PUBLIC_ETHERSCAN_URL_ETHEREUM}/tx/${txReceipt?.receipt?.transactionHash}`;
+  } else if (chain === "Polygon") {
+    link = `${process.env.NEXT_PUBLIC_POLYGONSCAN_URL_POLYGON}/tx/${txReceipt?.receipt?.transactionHash}`;
+  } else if (chain === "Binance") {
+    link = `${process.env.NEXT_PUBLIC_BINANCESCAN_URL_BINANCE}/tx/${txReceipt?.receipt?.transactionHash}`;
   }
 
   if (txReceipt && !isLoading)

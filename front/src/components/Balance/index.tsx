@@ -16,7 +16,13 @@ export default function Balance() {
   const { balance } = useBalance();
   let [intBalance, decimals] = balance.toString().split(".");
 
-  const symbol = localStorage.getItem("chain") === "Ethereum" ? "ETH" : "POL";
+  const chain = localStorage.getItem("chain");
+  const symbolMap: { [key: string]: string } = {
+    Ethereum: "ETH",
+    Polygon: "POL",
+    Binance: "BNB",
+  };
+  const symbol = symbolMap[chain as keyof typeof symbolMap] || "";
 
   return (
     <>

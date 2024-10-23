@@ -8,14 +8,20 @@ export async function GET(_req: Request, { params }: { params: { id: Hex } }) {
   const { id } = params;
 
   if (!id) {
-    return Response.json(JSON.parse(stringify({ error: "id is required" })));
+    return Response.json({ error: "id is required" });
   }
 
-  const contractAddress = chain === "Ethereum" ? process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_ETHEREUM : process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_POLYGON;
-  
   if (!chain) {
-    return Response.json(JSON.parse(stringify({ error: "chain is required" })));
+    return Response.json({ error: "chain is required" });
   }
+
+  const contractAddresses: Record<string, string | undefined> = {
+    Ethereum: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_ETHEREUM,
+    Polygon: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_POLYGON,
+    Binance: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_BINANCE,
+  };
+
+  const contractAddress = contractAddresses[chain] || process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_ETHEREUM;
 
   const user = await getPublicClient(chain).readContract({
     address: contractAddress as `0x${string}`,
@@ -23,16 +29,17 @@ export async function GET(_req: Request, { params }: { params: { id: Hex } }) {
     functionName: "getUser",
     args: [BigInt(id)],
   });
-  
-  //const balance = await PUBLIC_CLIENT.getBalance({ address: user.account });
+
   let balance = BigInt(0);
 
-  // Using etherscan api instead of getBalance as Sepolia rcp node is not inconsistent
   if (user?.account) {
-    const apiUrl = chain === "Ethereum"
-      ? `https://api-sepolia.etherscan.io/api?module=account&action=balance&address=${user.account}&tag=latest&apikey=${process.env.ETHERSCAN_API_KEY_ETHEREUM}`
-      : `https://api-amoy.polygonscan.com/api?module=account&action=balance&address=${user.account}&tag=latest&apikey=${process.env.POLYGONSCAN_API_KEY_POLYGON}`;
+    const apiUrls: Record<string, string> = {
+      Ethereum: `${process.env.NEXT_PUBLIC_ETHERSCAN_API_URL_ETHEREUM}?module=account&action=balance&address=${user.account}&tag=latest&apikey=${process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY_ETHEREUM}`,
+      Polygon: `${process.env.NEXT_PUBLIC_POLYGONSCAN_API_URL_POLYGON}?module=account&action=balance&address=${user.account}&tag=latest&apikey=${process.env.NEXT_PUBLIC_POLYGONSCAN_API_KEY_POLYGON}`,
+      Binance: `${process.env.NEXT_PUBLIC_BINANCESCAN_API_URL_BINANCE}?module=account&action=balance&address=${user.account}&tag=latest&apikey=${process.env.NEXT_PUBLIC_BINANCESCAN_API_KEY_BINANCE}`,
+    };
 
+    const apiUrl = apiUrls[chain];
     const result = await fetch(apiUrl, { cache: "no-store" });
     const resultJSON = await result.json();
     balance = BigInt(resultJSON?.result || 0);

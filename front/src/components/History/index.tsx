@@ -22,11 +22,36 @@ export default function History() {
           variant="outline"
           style={{ marginTop: ".3rem" }}
           onClick={() => {
-            if(chain === "Ethereum") window.open(`https://sepolia.etherscan.io/address/${me?.account}`, "_blank");
-            if(chain === "Polygon") window.open(`https://amoy.polygonscan.com/address/${me?.account}`, "_blank");
+            if (chain === "Ethereum")
+              window.open(
+                `${process.env.NEXT_PUBLIC_ETHERSCAN_URL_ETHEREUM}/address/${me?.account}`,
+                "_blank",
+              );
+            if (chain === "Polygon")
+              window.open(
+                `${process.env.NEXT_PUBLIC_POLYGONSCAN_URL_POLYGON}/address/${me?.account}`,
+                "_blank",
+              );
+            if (chain === "Binance")
+              window.open(
+                `${process.env.NEXT_PUBLIC_BINANCESCAN_URL_BINANCE}/address/${me?.account}`,
+                "_blank",
+              );
           }}
         >
-          Browse history on {chain === "Ethereum" ? "Etherscan" : "Polygonscan"}
+          Browse history on{" "}
+            {(() => {
+            switch (chain) {
+              case "Ethereum":
+              return "Etherscan";
+              case "Polygon":
+              return "Polygonscan";
+              case "Binance":
+              return "Binancescan";
+              default:
+              return "";
+            }
+            })()}
           <ArrowRightIcon />
         </Button>
       </Flex>

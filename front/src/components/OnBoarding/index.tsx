@@ -72,6 +72,7 @@ export default function OnBoarding() {
                     <Select.Label>Networks</Select.Label>
                     <Select.Item value="Ethereum">Ethereum Sepolia</Select.Item>
                     <Select.Item value="Polygon">Polygon Amoy</Select.Item>
+                    <Select.Item value="Binance">Binance Testnet</Select.Item>
                   </Select.Group>
                 </Select.Content>
               </Select.Root>

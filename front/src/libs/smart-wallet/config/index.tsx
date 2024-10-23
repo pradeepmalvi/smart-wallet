@@ -1,10 +1,15 @@
 import { fallback, http } from "viem";
 
-// const publicRpc = http("https://goerli.base.org");
-// const localhost = http("http://localhost:8545");
-const stackUpBundlerRpcUrl =
-  localStorage.getItem("chain") === "Ethereum"
-    ? http(`https://api.stackup.sh/v1/node/${process.env.NEXT_PUBLIC_STACKUP_BUNDLER_API_KEY_ETHEREUM}`)
-    : http(`https://api.stackup.sh/v1/node/${process.env.NEXT_PUBLIC_STACKUP_BUNDLER_API_KEY_POLYGON}`);
+const getStackUpBundlerRpcUrl = () => {
+  const chain = localStorage.getItem("chain") || "Ethereum";
+  const url: { [key: string]: string | undefined } = {
+    Ethereum: process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM,
+    Polygon: process.env.NEXT_PUBLIC_RPC_ENDPOINT_POLYGON,
+    Binance: process.env.NEXT_PUBLIC_RPC_ENDPOINT_BINANCE,
+  };
 
-export const transport = stackUpBundlerRpcUrl;
+  const mainURL = url[chain] || process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM;
+  return http(mainURL);
+};
+
+export const transport = getStackUpBundlerRpcUrl();

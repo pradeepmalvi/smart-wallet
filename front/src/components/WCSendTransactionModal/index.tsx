@@ -66,8 +66,8 @@ export default function WCSendTransactionModal({ params, origin, onSuccess }: Pr
     setError(null);
     try {
       if (!me?.keyId) throw new Error("No user found");
-      const builder = new UserOpBuilder(smartWallet.client.chain as Chain);
-      const { maxFeePerGas, maxPriorityFeePerGas } = await smartWallet.client.estimateFeesPerGas();
+      const builder = new UserOpBuilder(smartWallet!.client!.chain as Chain);
+      const { maxFeePerGas, maxPriorityFeePerGas } = await smartWallet!.client!.estimateFeesPerGas();
 
       const value = params?.value ? BigInt(params.value) : BigInt(0);
 

@@ -111,7 +111,7 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
       ).json();
       const { maxFeePerGas, maxPriorityFeePerGas }: EstimateFeesPerGasReturnType =
         await smartWallet!.client!.estimateFeesPerGas();
-
+      
       const userOp = await builder.buildUserOp({
         calls: [
           {
@@ -152,14 +152,15 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
     );
 
   const chain = localStorage.getItem("chain");
-  let link = `https://sepolia.etherscan.io/tx/${txReceipt?.receipt?.transactionHash}`;
+  let link = `${process.env.NEXT_PUBLIC_ETHERSCAN_URL_ETHEREUM}/tx/${txReceipt?.receipt?.transactionHash}`;
 
   if (chain === "Ethereum") {
-    link = `https://sepolia.etherscan.io/tx/${txReceipt?.receipt?.transactionHash}`;
-  } else {
-    link = `https://amoy.polygonscan.com/tx/${txReceipt?.receipt?.transactionHash}`;
+    link = `${process.env.NEXT_PUBLIC_ETHERSCAN_URL_ETHEREUM}/tx/${txReceipt?.receipt?.transactionHash}`;
+  } else if (chain === "Polygon") {
+    link = `${process.env.NEXT_PUBLIC_POLYGONSCAN_URL_POLYGON}/tx/${txReceipt?.receipt?.transactionHash}`;
+  } else if (chain === "Binance") {
+    link = `${process.env.NEXT_PUBLIC_BINANCESCAN_URL_BINANCE}/tx/${txReceipt?.receipt?.transactionHash}`;
   }
-
   if (txReceipt && !isLoading)
     return (
       <>
@@ -227,7 +228,7 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
                       pattern="0x[a-fA-F0-9]{40}|[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*\.eth"
                       title="an ethereum address or a valid ENS name"
                       placeholder="ENS or address"
-                      size={"3"}
+                      // size={"3"}
                       value={userInputDestination}
                       onChange={handleUserInputDestination}
                     />
@@ -262,10 +263,10 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
                         placeholder="0.00"
                         type="number"
                         inputMode="decimal"
-                        min={0}
+                        // min={0}
                         max={balance?.toString() || 0}
-                        size={"3"}
-                        step={0.01}
+                        // size={"3"}
+                        // step={0.01}
                         value={userInputAmount}
                         onChange={handleUserInputAmount}
                       />

@@ -42,22 +42,33 @@ export class UserOpBuilder {
 
   constructor(chain: Chain) {
     this.chain = chain;
-
     const selectedChain = localStorage.getItem("chain");
-    const factoryContractAddress =
-      selectedChain === "Ethereum"
-        ? process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_ETHEREUM
-        : process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_POLYGON;
+    const factoryContractAddress = (() => {
+      switch (selectedChain) {
+        case "Ethereum":
+          return process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_ETHEREUM;
+        case "Polygon":
+          return process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_POLYGON;
+        case "Binance":
+          return process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_BINANCE;
+        default:
+          return undefined;
+      }
+    })();
+
+    if (!selectedChain) {
+      throw new Error("Selected chain is not available in local storage");
+    }
 
     this.publicClient = createPublicClient({
-      chain: getChainFromLocalStorage(selectedChain as String),
-      transport: getTransportFromLocalStorage(selectedChain as String),
-    });
+      chain: getChainFromLocalStorage(selectedChain),
+      transport: getTransportFromLocalStorage(selectedChain),
+    }) as PublicClient;
 
     const walletClient = createWalletClient({
       account: this.relayer,
-      chain: getChainFromLocalStorage(selectedChain as String),
-      transport: getTransportFromLocalStorage(selectedChain as String),
+      chain: getChainFromLocalStorage(selectedChain),
+      transport: getTransportFromLocalStorage(selectedChain),
     });
 
     this.factoryContract = getContract({
@@ -117,7 +128,7 @@ export class UserOpBuilder {
       initCode,
       callData,
       maxFeePerGas,
-      maxPriorityFeePerGas,
+      maxPriorityFeePerGas: maxFeePerGas,
     };
 
     // estimate gas for this partial user operation
@@ -154,7 +165,7 @@ export class UserOpBuilder {
       callData: op.callData,
       callGasLimit: toHex(op.callGasLimit),
       verificationGasLimit: toHex(op.verificationGasLimit),
-      preVerificationGas: toHex(op.preVerificationGas),
+      preVerificationGas:  toHex(op.preVerificationGas),
       maxFeePerGas: toHex(op.maxFeePerGas),
       maxPriorityFeePerGas: toHex(op.maxPriorityFeePerGas),
       paymasterAndData: op.paymasterAndData === zeroAddress ? "0x" : op.paymasterAndData,

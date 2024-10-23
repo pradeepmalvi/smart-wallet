@@ -6,7 +6,7 @@ import { useMe } from "@/providers/MeProvider";
 import { PaperPlaneIcon, Cross2Icon } from "@radix-ui/react-icons";
 import { Flex, Text, Button } from "@radix-ui/themes";
 import { createPublicClient, http } from "viem";
-import { mainnet, sepolia, polygonAmoy } from "viem/chains";
+import { mainnet, sepolia, polygonAmoy, bscTestnet, arbitrumSepolia } from "viem/chains";
 import { formatUnits } from "viem/utils";
 import { useModal } from "@/providers/ModalProvider";
 import SendTokenTxModal from "../SendERC20TxModal";
@@ -15,12 +15,37 @@ const css: CSSProperties = {
   padding: "1rem 0",
 };
 
+const getChain = () => {
+  const chain = localStorage.getItem("chain");
+  switch (chain) {
+    case "Ethereum":
+      return sepolia;
+    case "Polygon":
+      return polygonAmoy;
+    case "Binance":
+      return bscTestnet;
+    default:
+      return sepolia;
+  }
+};
+
+const getRpcEndpoint = () => {
+  const chain = localStorage.getItem("chain");
+  switch (chain) {
+    case "Ethereum":
+      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM);
+    case "Polygon":
+      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_POLYGON);
+    case "Binance":
+      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_BINANCE);
+    default:
+      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM);
+  }
+};
+
 const client = createPublicClient({
-  chain: localStorage.getItem("chain") === "Ethereum" ? sepolia : polygonAmoy,
-  transport:
-    localStorage.getItem("chain") === "Ethereum"
-      ? http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM)
-      : http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_POLYGON),
+  chain: getChain(),
+  transport: getRpcEndpoint(),
 });
 
 const ERC20_ABI = [

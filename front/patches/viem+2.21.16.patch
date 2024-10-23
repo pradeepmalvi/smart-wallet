@@ -1,0 +1,14 @@
+diff --git a/node_modules/viem/actions/wallet/writeContract.ts b/node_modules/viem/actions/wallet/writeContract.ts
+index af8f212..fdc7562 100644
+--- a/node_modules/viem/actions/wallet/writeContract.ts
++++ b/node_modules/viem/actions/wallet/writeContract.ts
+@@ -180,7 +180,8 @@ export async function writeContract<
+     functionName,
+     ...request
+   } = parameters as WriteContractParameters
+-
++  debugger
++  console.log('writeContract', parameters)
+   if (!account_)
+     throw new AccountNotFoundError({
+       docsPath: '/docs/contract/writeContract',

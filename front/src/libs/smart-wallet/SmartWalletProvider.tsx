@@ -4,7 +4,6 @@ import React, { useContext } from "react";
 import { useSmartWalletHook } from "@/libs/smart-wallet/hook/useSmartWalletHook";
 import { WagmiConfig, createConfig, http } from "wagmi";
 import { mainnet, sepolia, polygonAmoy } from 'wagmi/chains'
-import { CHAIN } from "@/constants";
 
 type UseSmartWallet = ReturnType<typeof useSmartWalletHook>;
 
