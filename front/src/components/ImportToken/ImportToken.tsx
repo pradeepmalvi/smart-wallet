@@ -15,8 +15,6 @@ import Spinner from "../Spinner";
 import { MAINNET_PUBLIC_CLIENT } from "@/constants";
 import { normalize } from "viem/ens";
 
-smartWallet.init(localStorage.getItem("chain") as string);
-
 
 export default function ImportToken() {
   const [txReceipt, setTxReceipt] = useState<any>(null);
@@ -32,6 +30,7 @@ export default function ImportToken() {
   const addressInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    smartWallet.init(localStorage.getItem("chain") as string);
     const input = addressInputRef.current as HTMLInputElement;
     if (!input) return;
     if (userInputDestination.endsWith(".eth") && !destination) {

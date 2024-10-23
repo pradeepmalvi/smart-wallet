@@ -15,39 +15,6 @@ const css: CSSProperties = {
   padding: "1rem 0",
 };
 
-const getChain = () => {
-  const chain = localStorage.getItem("chain");
-  switch (chain) {
-    case "Ethereum":
-      return sepolia;
-    case "Polygon":
-      return polygonAmoy;
-    case "Binance":
-      return bscTestnet;
-    default:
-      return sepolia;
-  }
-};
-
-const getRpcEndpoint = () => {
-  const chain = localStorage.getItem("chain");
-  switch (chain) {
-    case "Ethereum":
-      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM);
-    case "Polygon":
-      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_POLYGON);
-    case "Binance":
-      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_BINANCE);
-    default:
-      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM);
-  }
-};
-
-const client = createPublicClient({
-  chain: getChain(),
-  transport: getRpcEndpoint(),
-});
-
 const ERC20_ABI = [
   {
     inputs: [
@@ -279,8 +246,51 @@ const TokenBalance = ({ token }: TokenBalanceProps) => {
   const [tokenDecimal, setTokenDecimal] = useState<number>(18);
   let [intBalance, decimals] = tokenBalance.toString().split(".");
 
+  const [chain, setChain] = useState<string | null>(null)
+
   const tokenContractAddress = token;
   const smartContractWalletAddress = me?.account;
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedChain = localStorage.getItem("chain");
+      setChain(storedChain);
+    }
+  }, []);
+
+
+
+const getChain = (chain: string) => {
+  switch (chain) {
+    case "Ethereum":
+      return sepolia;
+    case "Polygon":
+      return polygonAmoy;
+    case "Binance":
+      return bscTestnet;
+    default:
+      return sepolia;
+  }
+};
+
+const getRpcEndpoint = (chain: string) => {
+  switch (chain) {
+    case "Ethereum":
+      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM);
+    case "Polygon":
+      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_POLYGON);
+    case "Binance":
+      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_BINANCE);
+    default:
+      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM);
+  }
+};
+
+const client = createPublicClient({
+  chain: getChain(chain as string),
+  transport: getRpcEndpoint(chain as string),
+});
+
 
   useEffect(() => {
     const fetchTokenBalance = async () => {

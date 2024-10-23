@@ -17,8 +17,7 @@ import Spinner from "../Spinner";
 import { MAINNET_PUBLIC_CLIENT } from "@/constants";
 import { normalize } from "viem/ens";
 
-smartWallet.init(localStorage.getItem("chain") as string);
-const builder = new UserOpBuilder(smartWallet!.client!.chain as Chain);
+
 
 export default function SendTokenTxModal({
   type,
@@ -41,10 +40,14 @@ export default function SendTokenTxModal({
   const [destination, setDestination] = useState("");
   const { me } = useMe();
   const { balance, refreshBalance } = useBalance();
+  let builder: UserOpBuilder | null = null;
+  const [chain, setChain] = useState<string | null>(null);
 
   const addressInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    smartWallet.init(localStorage.getItem("chain") as string);
+    builder = new UserOpBuilder(smartWallet!.client!.chain as Chain);
     const input = addressInputRef.current as HTMLInputElement;
     if (!input) return;
     if (userInputDestination.endsWith(".eth") && !destination) {
@@ -53,6 +56,15 @@ export default function SendTokenTxModal({
     }
     input.setCustomValidity("");
   }, [userInputDestination, destination]);
+
+  
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedChain = localStorage.getItem("chain");
+      setChain(storedChain);
+    }
+  }, []);
 
   function handleUserInputDestination(e: any) {
     const value = e.target.value;
@@ -121,6 +133,9 @@ export default function SendTokenTxModal({
       ).json();
       const { maxFeePerGas, maxPriorityFeePerGas }: EstimateFeesPerGasReturnType =
         await smartWallet!.client!.estimateFeesPerGas();
+      if (!builder) {
+        throw new Error("Builder is not initialized");
+      }
       const userOp = await builder.buildUserOp({
         calls: {
           token: token as Hex,
@@ -152,7 +167,6 @@ export default function SendTokenTxModal({
       </Flex>
     );
 
-  const chain = localStorage.getItem("chain");
   let link = `${process.env.NEXT_PUBLIC_ETHERSCAN_URL_ETHEREUM}/tx/${txReceipt?.receipt?.transactionHash}`;
 
   if (chain === "Ethereum") {

@@ -17,8 +17,8 @@ import Spinner from "../Spinner";
 import { MAINNET_PUBLIC_CLIENT } from "@/constants";
 import { normalize } from "viem/ens";
 
-smartWallet.init(localStorage.getItem('chain') as string);
-const builder = new UserOpBuilder(smartWallet!.client!.chain as Chain);
+let builder: UserOpBuilder | null = null;
+
 
 export default function SendTxModal({ symbol }: { symbol: string }) {
   const [txReceipt, setTxReceipt] = useState<any>(null);
@@ -33,8 +33,18 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
   const { balance, refreshBalance } = useBalance();
 
   const addressInputRef = useRef<HTMLInputElement>(null);
+  const [chain, setChain] = useState<string | null>(null);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedChain = localStorage.getItem("chain");
+      setChain(storedChain);
+    }
+  }, []);
+
+  useEffect(() => {
+    smartWallet.init(localStorage.getItem("chain") as string);
+    builder = new UserOpBuilder(smartWallet!.client!.chain as Chain);
     const input = addressInputRef.current as HTMLInputElement;
     if (!input) return;
     if (userInputDestination.endsWith(".eth") && !destination) {
@@ -111,7 +121,9 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
       ).json();
       const { maxFeePerGas, maxPriorityFeePerGas }: EstimateFeesPerGasReturnType =
         await smartWallet!.client!.estimateFeesPerGas();
-      
+      if (!builder) {
+        throw new Error("Builder is not initialized");
+      }
       const userOp = await builder.buildUserOp({
         calls: [
           {
@@ -125,7 +137,7 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
         ],
         maxFeePerGas: maxFeePerGas as bigint,
         maxPriorityFeePerGas: maxPriorityFeePerGas as bigint,
-        keyId: me?.keyId as Hex
+        keyId: me?.keyId as Hex,
       });
       const hash = await smartWallet.sendUserOperation({ userOp });
       const receipt = await smartWallet.waitForUserOperationReceipt({ hash });
@@ -151,7 +163,7 @@ export default function SendTxModal({ symbol }: { symbol: string }) {
       </Flex>
     );
 
-  const chain = localStorage.getItem("chain");
+  
   let link = `${process.env.NEXT_PUBLIC_ETHERSCAN_URL_ETHEREUM}/tx/${txReceipt?.receipt?.transactionHash}`;
 
   if (chain === "Ethereum") {

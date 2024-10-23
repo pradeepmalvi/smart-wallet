@@ -2,7 +2,7 @@
 
 import { useBalance } from "@/providers/BalanceProvider";
 import { Button, Flex, Text } from "@radix-ui/themes";
-import { CSSProperties } from "react";
+import { CSSProperties, useEffect, useState } from "react";
 import SendTxModal from "../SendTxModal";
 import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import { useModal } from "@/providers/ModalProvider";
@@ -15,8 +15,14 @@ export default function Balance() {
   const { open } = useModal();
   const { balance } = useBalance();
   let [intBalance, decimals] = balance.toString().split(".");
+  const [chain, setChain] = useState<string | null>(null);
 
-  const chain = localStorage.getItem("chain");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedChain = localStorage.getItem("chain");
+      setChain(storedChain);
+    }
+  }, []);
   const symbolMap: { [key: string]: string } = {
     Ethereum: "ETH",
     Polygon: "POL",
