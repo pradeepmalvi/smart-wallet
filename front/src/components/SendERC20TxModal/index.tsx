@@ -14,10 +14,10 @@ import {
 } from "@radix-ui/react-icons";
 import { useMe } from "@/providers/MeProvider";
 import Spinner from "../Spinner";
-import { MAINNET_PUBLIC_CLIENT } from "@/constants";
+import { getExplorerUrl, MAINNET_PUBLIC_CLIENT } from "@/constants";
 import { normalize } from "viem/ens";
 
-
+let builder: UserOpBuilder | null = null;
 
 export default function SendTokenTxModal({
   type,
@@ -40,7 +40,7 @@ export default function SendTokenTxModal({
   const [destination, setDestination] = useState("");
   const { me } = useMe();
   const { balance, refreshBalance } = useBalance();
-  let builder: UserOpBuilder | null = null;
+
   const [chain, setChain] = useState<string | null>(null);
 
   const addressInputRef = useRef<HTMLInputElement>(null);
@@ -56,8 +56,6 @@ export default function SendTokenTxModal({
     }
     input.setCustomValidity("");
   }, [userInputDestination, destination]);
-
-  
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -136,7 +134,8 @@ export default function SendTokenTxModal({
       if (!builder) {
         throw new Error("Builder is not initialized");
       }
-      const userOp = await builder.buildUserOp({
+      debugger
+      const hash = await builder.buildUserOp({
         calls: {
           token: token as Hex,
           to: destination.toLowerCase() as Hex,
@@ -147,7 +146,7 @@ export default function SendTokenTxModal({
         keyId: me?.keyId as Hex,
         transferType: type,
       });
-      const hash = await smartWallet.sendUserOperation({ userOp });
+      // const hash = await smartWallet.sendUserOperation({ userOp });
       const receipt = await smartWallet.waitForUserOperationReceipt({ hash });
       setTxReceipt(receipt);
     } catch (e: any) {
@@ -167,15 +166,7 @@ export default function SendTokenTxModal({
       </Flex>
     );
 
-  let link = `${process.env.NEXT_PUBLIC_ETHERSCAN_URL_ETHEREUM}/tx/${txReceipt?.receipt?.transactionHash}`;
-
-  if (chain === "Ethereum") {
-    link = `${process.env.NEXT_PUBLIC_ETHERSCAN_URL_ETHEREUM}/tx/${txReceipt?.receipt?.transactionHash}`;
-  } else if (chain === "Polygon") {
-    link = `${process.env.NEXT_PUBLIC_POLYGONSCAN_URL_POLYGON}/tx/${txReceipt?.receipt?.transactionHash}`;
-  } else if (chain === "Binance") {
-    link = `${process.env.NEXT_PUBLIC_BINANCESCAN_URL_BINANCE}/tx/${txReceipt?.receipt?.transactionHash}`;
-  }
+  let link = `${getExplorerUrl(chain as string)}/tx/${txReceipt?.receipt?.transactionHash}`;
 
   if (txReceipt && !isLoading)
     return (

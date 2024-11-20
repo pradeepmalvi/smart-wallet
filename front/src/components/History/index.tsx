@@ -4,6 +4,7 @@ import { Button, Flex, Callout } from "@radix-ui/themes";
 import { useMe } from "@/providers/MeProvider";
 import { ArrowRightIcon } from "@radix-ui/react-icons";
 import LogoAnimatedLight from "../LogoAnimatedLight";
+import { getExplorerName, getExplorerUrl } from "@/constants";
 
 export default function History() {
   const { me } = useMe();
@@ -22,36 +23,11 @@ export default function History() {
           variant="outline"
           style={{ marginTop: ".3rem" }}
           onClick={() => {
-            if (chain === "Ethereum")
-              window.open(
-                `${process.env.NEXT_PUBLIC_ETHERSCAN_URL_ETHEREUM}/address/${me?.account}`,
-                "_blank",
-              );
-            if (chain === "Polygon")
-              window.open(
-                `${process.env.NEXT_PUBLIC_POLYGONSCAN_URL_POLYGON}/address/${me?.account}`,
-                "_blank",
-              );
-            if (chain === "Binance")
-              window.open(
-                `${process.env.NEXT_PUBLIC_BINANCESCAN_URL_BINANCE}/address/${me?.account}`,
-                "_blank",
-              );
+            window.open(`${getExplorerUrl(chain as string)}/address/${me?.account}`, "_blank");
           }}
         >
           Browse history on{" "}
-            {(() => {
-            switch (chain) {
-              case "Ethereum":
-              return "Etherscan";
-              case "Polygon":
-              return "Polygonscan";
-              case "Binance":
-              return "Binancescan";
-              default:
-              return "";
-            }
-            })()}
+          {getExplorerName(chain as string).replace("Etherscan", "Explorer").replace("Scan", "")}
           <ArrowRightIcon />
         </Button>
       </Flex>

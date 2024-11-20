@@ -10,6 +10,7 @@ import { mainnet, sepolia, polygonAmoy, bscTestnet, arbitrumSepolia } from "viem
 import { formatUnits } from "viem/utils";
 import { useModal } from "@/providers/ModalProvider";
 import SendTokenTxModal from "../SendERC20TxModal";
+import { getChainFromLocalStorage, getRpcEndpoint, getTransportFromLocalStorage } from "@/constants";
 
 const css: CSSProperties = {
   padding: "1rem 0",
@@ -258,41 +259,14 @@ const TokenBalance = ({ token }: TokenBalanceProps) => {
     }
   }, []);
 
-
-
-const getChain = (chain: string) => {
-  switch (chain) {
-    case "Ethereum":
-      return sepolia;
-    case "Polygon":
-      return polygonAmoy;
-    case "Binance":
-      return bscTestnet;
-    default:
-      return sepolia;
-  }
-};
-
-const getRpcEndpoint = (chain: string) => {
-  switch (chain) {
-    case "Ethereum":
-      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM);
-    case "Polygon":
-      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_POLYGON);
-    case "Binance":
-      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_BINANCE);
-    default:
-      return http(process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM);
-  }
-};
-
-const client = createPublicClient({
-  chain: getChain(chain as string),
-  transport: getRpcEndpoint(chain as string),
-});
-
-
   useEffect(() => {
+    if(!chain) return;
+    
+    const client = createPublicClient({
+      chain: getChainFromLocalStorage(chain as string),
+      transport: getTransportFromLocalStorage(chain as string),
+    });
+
     const fetchTokenBalance = async () => {
       if (!tokenContractAddress) {
         console.error("Token contract address is not defined");
@@ -326,7 +300,7 @@ const client = createPublicClient({
     };
 
     fetchTokenBalance();
-  }, []);
+  }, [chain]);
 
   const removeToken = () => {
     
