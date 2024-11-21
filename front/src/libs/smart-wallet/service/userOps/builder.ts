@@ -29,9 +29,10 @@ import {
   ENTRYPOINT_ADDRESS,
   FACTORY_ABI,
   getChainFromLocalStorage,
+  getFactoryContract,
   getTransportFromLocalStorage,
 } from "@/constants";
-import { smartWallet } from "@/libs/smart-wallet";
+
 
 export class UserOpBuilder {
   public relayer: Hex = "0x061060a65146b3265C62fC8f3AE977c9B27260fF";
@@ -43,18 +44,7 @@ export class UserOpBuilder {
   constructor(chain: Chain) {
     this.chain = chain;
     const selectedChain = localStorage.getItem("chain");
-    const factoryContractAddress = (() => {
-      switch (selectedChain) {
-        case "Ethereum":
-          return process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_ETHEREUM;
-        case "Polygon":
-          return process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_POLYGON;
-        case "Binance":
-          return process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_BINANCE;
-        default:
-          return undefined;
-      }
-    })();
+    const factoryContractAddress = getFactoryContract(selectedChain as string);
 
     if (!selectedChain) {
       throw new Error("Selected chain is not available in local storage");
@@ -120,6 +110,8 @@ export class UserOpBuilder {
       callData = this._addCallData(calls as NativeCall[]);
     }
 
+    const allGas = await this._pimlico_getUserOperationGasPrice()
+
     // create user operation
     const userOp: UserOperation = {
       ...DEFAULT_USER_OP,
@@ -127,24 +119,36 @@ export class UserOpBuilder {
       nonce,
       initCode,
       callData,
-      maxFeePerGas,
-      maxPriorityFeePerGas: maxFeePerGas,
+      maxFeePerGas: BigInt(allGas.maxFeePerGas),
+      maxPriorityFeePerGas: BigInt(allGas.maxPriorityFeePerGas),
     };
 
     // estimate gas for this partial user operation
     // real good article about the subject can be found here:
     // https://www.alchemy.com/blog/erc-4337-gas-estimation
+    // const { callGasLimit, verificationGasLimit, preVerificationGas } =
+    //   await smartWallet.estimateUserOperationGas({
+    //     userOp: this.toParams(userOp),
+    //   });
+
+    // // set gas limits with the estimated values + some extra gas for safety
+    // userOp.callGasLimit = BigInt(callGasLimit);
+    // userOp.preVerificationGas = BigInt(preVerificationGas) * BigInt(10);
+    // userOp.verificationGasLimit =
+    //   BigInt(verificationGasLimit) + BigInt(150_000) + BigInt(initCodeGas) + BigInt(1_000_000);
+
+
+
+    // estimate gas for this partial user operation
+    // real good article about the subject can be found here:
+    // https://www.alchemy.com/blog/erc-4337-gas-estimation
     const { callGasLimit, verificationGasLimit, preVerificationGas } =
-      await smartWallet.estimateUserOperationGas({
-        userOp: this.toParams(userOp),
-      });
+    await this._estimateUserOperationGas(this.toParams(userOp));
 
     // set gas limits with the estimated values + some extra gas for safety
-    userOp.callGasLimit = BigInt(callGasLimit);
-    userOp.preVerificationGas = BigInt(preVerificationGas) * BigInt(10);
-    userOp.verificationGasLimit =
-      BigInt(verificationGasLimit) + BigInt(150_000) + BigInt(initCodeGas) + BigInt(1_000_000);
-
+    userOp.callGasLimit = BigInt(callGasLimit)
+    userOp.preVerificationGas = BigInt(preVerificationGas) * BigInt(2)
+    userOp.verificationGasLimit = BigInt(verificationGasLimit) + BigInt(150_000) + BigInt(initCodeGas) + BigInt(1_000_000);
     // get userOp hash (with signature == 0x) by calling the entry point contract
     const userOpHash = await this._getUserOpHash(userOp);
 
@@ -154,7 +158,14 @@ export class UserOpBuilder {
     // get signature from webauthn
     const signature = await this.getSignature(msgToSign, keyId);
 
-    return this.toParams({ ...userOp, signature });
+    // With alchemy
+    // const hash = await smartWallet.sendUserOperation({ userOp: _userOpFinal });
+
+    // With Pimlico
+    const _userOpFinal = this.toParams({ ...userOp, signature });
+    const hash = await this._sendUserOperation(_userOpFinal);
+
+    return hash;
   }
 
   public toParams(op: UserOperation): UserOperationAsHex {
@@ -171,6 +182,106 @@ export class UserOpBuilder {
       paymasterAndData: op.paymasterAndData === zeroAddress ? "0x" : op.paymasterAndData,
       signature: op.signature,
     };
+  }
+
+  private async _pimlico_getUserOperationGasPrice() {
+    const options = {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "pimlico_getUserOperationGasPrice",
+        params: [],
+      }),
+    };
+
+    try {
+      const response = await fetch(
+        "https://api.pimlico.io/v2/11155111/rpc?apikey=pim_NECPie9FQeZ6EvcURWLTHH",
+        options,
+      );
+      const data = await response.json();
+      return data.result.slow;
+    } catch (err) {
+      console.error(err);
+      throw new Error("Failed to estimate gas for user operation");
+    }
+  }
+
+  private async _estimateUserOperationGas(userOp: any) {
+    const options = {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_estimateUserOperationGas",
+        params: [userOp, "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"],
+      }),
+    };
+
+    try {
+      const response = await fetch(
+        "https://api.pimlico.io/v2/11155111/rpc?apikey=pim_NECPie9FQeZ6EvcURWLTHH",
+        options,
+      );
+      const data = await response.json();
+      return data.result;
+    } catch (err) {
+      console.error(err);
+      throw new Error("Failed to estimate gas for user operation");
+    }
+  }
+
+  private async _sendUserOperation(userOp: UserOperation) {
+    const options = {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_sendUserOperation",
+        params: [userOp, "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"],
+      }),
+    };
+
+    try {
+      const response = await fetch(
+        "https://api.pimlico.io/v2/11155111/rpc?apikey=pim_NECPie9FQeZ6EvcURWLTHH",
+        options,
+      );
+      const data = await response.json();
+      return data.result;
+    } catch (err) {
+      console.error(err);
+      throw new Error("Failed to send user operation");
+    }
+  }
+
+  private async _getUserOperationReceipt(hash: UserOperation) {
+    const options = {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_getUserOperationReceipt",
+        params: [hash],
+      }),
+    };
+
+    try {
+      const response = await fetch(
+        "https://api.pimlico.io/v2/11155111/rpc?apikey=pim_NECPie9FQeZ6EvcURWLTHH",
+        options,
+      );
+      const data = await response.json();
+      return data.result;
+    } catch (err) {
+      console.error(err);
+      throw new Error("Failed to send user operation");
+    }
   }
 
   public async getSignature(msgToSign: Hex, keyId: Hex): Promise<Hex> {

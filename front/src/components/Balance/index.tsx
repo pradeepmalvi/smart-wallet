@@ -6,6 +6,7 @@ import { CSSProperties, useEffect, useState } from "react";
 import SendTxModal from "../SendTxModal";
 import { PaperPlaneIcon } from "@radix-ui/react-icons";
 import { useModal } from "@/providers/ModalProvider";
+import { getNativeToken } from "@/constants";
 
 const css: CSSProperties = {
   padding: "2rem 0 1rem 0",
@@ -23,12 +24,7 @@ export default function Balance() {
       setChain(storedChain);
     }
   }, []);
-  const symbolMap: { [key: string]: string } = {
-    Ethereum: "ETH",
-    Polygon: "POL",
-    Binance: "BNB",
-  };
-  const symbol = symbolMap[chain as keyof typeof symbolMap] || "";
+  const symbol = getNativeToken(chain as string);
 
   return (
     <>

@@ -6,6 +6,7 @@ import ThemeButton from "../ThemeButton";
 import LogoAnimated from "../LogoAnimated";
 import Spinner from "../Spinner";
 import BaseLogo from "../BaseLogo";
+import { allNetwork } from "@/constants";
 
 export default function OnBoarding() {
   const [username, setUsername] = useState("");
@@ -68,11 +69,12 @@ export default function OnBoarding() {
               <Select.Root defaultValue={localStorage.getItem('chain') || "Ethererum"} onValueChange={(value) => onSelectChain(value)}>
                 <Select.Trigger style={{ width: "250px" }} />
                 <Select.Content style={{ width: "250px" }}>
+                 
                   <Select.Group style={{ width: "250px" }}>
                     <Select.Label>Networks</Select.Label>
-                    <Select.Item value="Ethereum">Ethereum Sepolia</Select.Item>
-                    <Select.Item value="Polygon">Polygon Amoy</Select.Item>
-                    <Select.Item value="Binance">Binance Testnet</Select.Item>
+                    {allNetwork.map(network => (
+                      <Select.Item key={network.name} value={network.name}>{network.name} {network.testnet}</Select.Item>
+                    ))}
                   </Select.Group>
                 </Select.Content>
               </Select.Root>

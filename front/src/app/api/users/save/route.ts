@@ -1,5 +1,6 @@
 import {
   getChainFromLocalStorage,
+  getFactoryContract,
   getPublicClient,
   getTransportFromLocalStorage,
 } from "@/constants";
@@ -14,21 +15,11 @@ export async function POST(req: Request) {
     chain: string;
   };
 
-  const privateKeyMap: { [key: string]: string | undefined } = {
-    Ethereum: process.env.RELAYER_PRIVATE_KEY_ETHEREUM,
-    Polygon: process.env.RELAYER_PRIVATE_KEY_POLYGON,
-    Binance: process.env.RELAYER_PRIVATE_KEY_BINANCE,
-  };
+  console.log( { id, pubKey, chain })
+  
 
-  const factoryContractMap: { [key: string]: string | undefined } = {
-    Ethereum: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_ETHEREUM,
-    Polygon: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_POLYGON,
-    Binance: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_BINANCE,
-  };
-
-  const privateKey = privateKeyMap[chain] || process.env.RELAYER_PRIVATE_KEY_ETHEREUM;
-  const factoryContract =
-    factoryContractMap[chain] || process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_ETHEREUM;
+  const privateKey = process.env.RELAYER_PRIVATE_KEY;
+  const factoryContract = getFactoryContract(chain);
 
   const account = privateKeyToAccount(privateKey as Hex);
   const walletClient = createWalletClient({
@@ -44,16 +35,21 @@ export async function POST(req: Request) {
     args: [BigInt(id)],
   });
 
+  console.log('here0', user)
+
   if (user.account !== zeroAddress) {
     return Response?.json({ error: "User already exists" });
   }
 
+  console.log('here1')
   await walletClient.writeContract({
     address: factoryContract as Hex,
     abi: FACTORY_ABI,
     functionName: "saveUser",
     args: [BigInt(id), pubKey],
   });
+
+  console.log('here2')
 
   const smartWalletAddress = await getPublicClient(chain).readContract({
     address: factoryContract as Hex,
@@ -62,13 +58,11 @@ export async function POST(req: Request) {
     args: [pubKey],
   });
 
-  const transactionCount = await getPublicClient(chain).getTransactionCount({
-    address: "0x9eC80B438e5DCE70123541311290aA6c1e197d21",
-  });
+  console.log('here3', smartWalletAddress)
+
   await walletClient.sendTransaction({
     to: smartWalletAddress,
-    value: BigInt(1),
-    nonce: transactionCount + 1,
+    value: BigInt(1)
   });
 
   const createdUser = {

@@ -3,6 +3,7 @@ import { Flex, IconButton, Text } from "@radix-ui/themes";
 import Address from "../Address";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { getNetworkWithTestnetName } from "@/constants";
 
 export default function TopBar() {
   const [chain, setChain] = useState<string | null>(null);
@@ -10,19 +11,6 @@ export default function TopBar() {
   useEffect(() => {
     setChain(localStorage.getItem("chain"));
   }, []);
-
-  const getChainName = (chain: string | null) => {
-    switch (chain) {
-      case "Ethereum":
-        return "Ethereum Sepolia";
-      case "Polygon":
-        return "Polygon Amoy";
-      case "Binance":
-        return "Binance Testnet";
-      default:
-        return null;
-    }
-  };
 
   return (
     <Flex width="100%" justify="between" align="center" style={{ position: "relative" }}>
@@ -40,7 +28,7 @@ export default function TopBar() {
         size="1"
         style={{ color: "var(--gray-6)", position: "absolute", top: "2.5rem", left: "1.1rem" }}
       >
-        on {getChainName(chain)}
+        on {getNetworkWithTestnetName(chain as string)}
       </Text>
     </Flex>
   );
