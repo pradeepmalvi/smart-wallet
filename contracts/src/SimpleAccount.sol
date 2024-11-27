@@ -205,4 +205,9 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271 {
     ) external onlyEntryPoint {
         require(IERC20(token).transfer(to, amount), "Transfer failed");
     }
+
+    function upgradeAccount(address proxy, address payable newImplementation) external onlyEntryPoint{
+        // Upgrade the implementation of the given proxy
+        UUPSUpgradeable(proxy).upgradeTo(newImplementation);
+    }
 }

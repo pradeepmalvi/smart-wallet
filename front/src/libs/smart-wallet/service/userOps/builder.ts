@@ -108,9 +108,10 @@ export class UserOpBuilder {
       callData = this._addCallTokenData(calls as TokenCall);
     } else {
       callData = this._addCallData(calls as NativeCall[]);
+      // callData = this._addCallDataForUpgrade("0x917aF1dc43cD6F617653C3BC94d633aC2859A4F9", "0xb67698AF4cC9880AdaedE3b8D65c7ac55fb2732f" as any);
     }
 
-    const allGas = await this._pimlico_getUserOperationGasPrice()
+    const maxGas = await this._pimlico_getUserOperationGasPrice()
 
     // create user operation
     const userOp: UserOperation = {
@@ -119,36 +120,24 @@ export class UserOpBuilder {
       nonce,
       initCode,
       callData,
-      maxFeePerGas: BigInt(allGas.maxFeePerGas),
-      maxPriorityFeePerGas: BigInt(allGas.maxPriorityFeePerGas),
+      maxFeePerGas: BigInt(maxGas.maxFeePerGas),
+      maxPriorityFeePerGas: BigInt(maxGas.maxPriorityFeePerGas),
     };
 
-    // estimate gas for this partial user operation
-    // real good article about the subject can be found here:
-    // https://www.alchemy.com/blog/erc-4337-gas-estimation
-    // const { callGasLimit, verificationGasLimit, preVerificationGas } =
-    //   await smartWallet.estimateUserOperationGas({
-    //     userOp: this.toParams(userOp),
-    //   });
-
-    // // set gas limits with the estimated values + some extra gas for safety
+    // With alchemy
+    // const { callGasLimit, verificationGasLimit, preVerificationGas } = await smartWallet.estimateUserOperationGas({ userOp: this.toParams(userOp)});
     // userOp.callGasLimit = BigInt(callGasLimit);
     // userOp.preVerificationGas = BigInt(preVerificationGas) * BigInt(10);
-    // userOp.verificationGasLimit =
-    //   BigInt(verificationGasLimit) + BigInt(150_000) + BigInt(initCodeGas) + BigInt(1_000_000);
+    // userOp.verificationGasLimit = BigInt(verificationGasLimit) + BigInt(150_000) + BigInt(initCodeGas) + BigInt(1_000_000);
 
 
-
-    // estimate gas for this partial user operation
-    // real good article about the subject can be found here:
-    // https://www.alchemy.com/blog/erc-4337-gas-estimation
-    const { callGasLimit, verificationGasLimit, preVerificationGas } =
-    await this._estimateUserOperationGas(this.toParams(userOp));
-
-    // set gas limits with the estimated values + some extra gas for safety
+    // With Pimlico
+    const { callGasLimit, verificationGasLimit, preVerificationGas } = await this._estimateUserOperationGas(this.toParams(userOp));
     userOp.callGasLimit = BigInt(callGasLimit)
     userOp.preVerificationGas = BigInt(preVerificationGas) * BigInt(2)
     userOp.verificationGasLimit = BigInt(verificationGasLimit) + BigInt(150_000) + BigInt(initCodeGas) + BigInt(1_000_000);
+
+
     // get userOp hash (with signature == 0x) by calling the entry point contract
     const userOpHash = await this._getUserOpHash(userOp);
 
@@ -158,11 +147,11 @@ export class UserOpBuilder {
     // get signature from webauthn
     const signature = await this.getSignature(msgToSign, keyId);
 
+    const _userOpFinal = this.toParams({ ...userOp, signature });
     // With alchemy
     // const hash = await smartWallet.sendUserOperation({ userOp: _userOpFinal });
 
     // With Pimlico
-    const _userOpFinal = this.toParams({ ...userOp, signature });
     const hash = await this._sendUserOperation(_userOpFinal);
 
     return hash;
@@ -177,8 +166,8 @@ export class UserOpBuilder {
       callGasLimit: toHex(op.callGasLimit),
       verificationGasLimit: toHex(op.verificationGasLimit),
       preVerificationGas:  toHex(op.preVerificationGas),
-      maxFeePerGas: toHex(op.maxFeePerGas),
-      maxPriorityFeePerGas: toHex(op.maxPriorityFeePerGas),
+      maxFeePerGas:  toHex(op.maxFeePerGas),
+      maxPriorityFeePerGas:  toHex(op.maxPriorityFeePerGas),
       paymasterAndData: op.paymasterAndData === zeroAddress ? "0x" : op.paymasterAndData,
       signature: op.signature,
     };
@@ -451,6 +440,34 @@ export class UserOpBuilder {
       args: [calls.token, calls.to, calls.amount],
     });
   }
+
+
+  // private _addCallDataForUpgrade(proxy: string, newImplementation: string): Hex {
+  //   return encodeFunctionData({
+  //     abi: [
+  //       {
+  //         inputs: [
+  //           {
+  //             internalType: "address",
+  //             name: "proxy",
+  //             type: "address",
+  //           },
+  //           {
+  //             internalType: "address payable",
+  //             name: "newImplementation",
+  //             type: "address",
+  //           },
+  //         ],
+  //         name: "upgradeAccount",
+  //         outputs: [],
+  //         stateMutability: "nonpayable",
+  //         type: "function",
+  //       },
+  //     ],
+  //     functionName: "upgradeAccount",
+  //     args: [proxy, newImplementation],
+  //   });
+  // }
 
   private async _getNonce(smartWalletAddress: Hex): Promise<bigint> {
     const nonce: bigint = await this.publicClient.readContract({

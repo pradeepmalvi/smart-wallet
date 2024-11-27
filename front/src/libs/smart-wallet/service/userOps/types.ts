@@ -15,14 +15,14 @@ export type TokenCall = {
 
 export type UserOperation = {
   sender: Hex;
-  nonce: bigint;
+  nonce: any;
   initCode: Hex;
   callData: Hex;
-  callGasLimit: bigint;
-  verificationGasLimit: bigint;
-  preVerificationGas: bigint;
-  maxFeePerGas: bigint;
-  maxPriorityFeePerGas: bigint;
+  callGasLimit: any;
+  verificationGasLimit: any;
+  preVerificationGas: any;
+  maxFeePerGas: any;
+  maxPriorityFeePerGas: any;
   paymasterAndData: Hex;
   signature: Hex;
 };
