@@ -14,13 +14,14 @@ struct User {
 
 contract SimpleAccountFactory is ReentrancyGuard {
     SimpleAccount public accountImplem;
-    IEntryPoint public immutable entryPoint;
+    IEntryPoint public immutable entryPoint; // Marked immutable for efficiency
     address public owner;
 
     mapping(uint256 => User) public users;
 
     event UserSaved(uint256 indexed id, bytes32[2] publicKey, address account);
     event AccountCreated(address indexed account, bytes32[2] publicKey);
+    event ImplementationUpdated(address indexed newImplementation);
 
     constructor(IEntryPoint _entryPoint) {
         owner = msg.sender;
@@ -28,20 +29,32 @@ contract SimpleAccountFactory is ReentrancyGuard {
         accountImplem = new SimpleAccount(_entryPoint);
     }
 
+    modifier onlyOwner() {
+        require(msg.sender == owner, "only owner");
+        _;
+    }
+
     function saveUser(uint256 id, bytes32[2] memory publicKey) external nonReentrant {
         require(users[id].id == 0, "User ID already exists");
+        require(publicKey[0] != bytes32(0) && publicKey[1] != bytes32(0), "Invalid public key"); // Added key validation
         address calculatedAddress = this.getAddress(publicKey);
         users[id] = User(id, publicKey, calculatedAddress);
         emit UserSaved(id, publicKey, calculatedAddress);
     }
 
     function getUser(uint256 id) external view returns (User memory) {
+        require(users[id].id != 0, "User does not exist"); // Added check for non-existent users
         return users[id];
     }
 
-    function createAccount(
-        bytes32[2] memory publicKey
-    ) external payable nonReentrant returns (SimpleAccount) {
+    function createAccount(bytes32[2] memory publicKey)
+        external
+        payable
+        nonReentrant
+        returns (SimpleAccount)
+    {
+        require(publicKey[0] != bytes32(0) && publicKey[1] != bytes32(0), "Invalid public key"); // Validate publicKey
+
         address addr = getAddress(publicKey);
 
         if (msg.value > 0) {
@@ -52,6 +65,7 @@ contract SimpleAccountFactory is ReentrancyGuard {
             return SimpleAccount(payable(addr));
         }
 
+        // Proxy creation with deterministic address
         address proxyAddress = address(
             new ERC1967Proxy{salt: keccak256(abi.encodePacked(publicKey))}(
                 address(accountImplem),
@@ -59,13 +73,12 @@ contract SimpleAccountFactory is ReentrancyGuard {
             )
         );
 
+        require(proxyAddress == addr, "Address mismatch"); // Ensure proxy matches expected address
         emit AccountCreated(proxyAddress, publicKey);
         return SimpleAccount(payable(proxyAddress));
     }
 
-    function getAddress(
-        bytes32[2] memory publicKey
-    ) public view returns (address) {
+    function getAddress(bytes32[2] memory publicKey) public view returns (address) {
         return
             Create2.computeAddress(
                 keccak256(abi.encodePacked(publicKey)),
@@ -81,12 +94,9 @@ contract SimpleAccountFactory is ReentrancyGuard {
             );
     }
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "only Owner");
-        _;
-    }
-    
     function setImplementation(SimpleAccount newImplementation) external onlyOwner {
+        require(address(newImplementation) != address(0), "Invalid implementation address"); // Ensure non-zero address
         accountImplem = newImplementation;
+        emit ImplementationUpdated(address(newImplementation)); // Emit event for traceability
     }
 }

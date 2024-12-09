@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.13;
 
 import "forge-std/console2.sol";
@@ -12,6 +11,7 @@ import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 struct Signature {
     bytes authenticatorData;
@@ -29,21 +29,21 @@ struct Call {
 }
 
 contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271, ReentrancyGuard {
+    using Address for address;
+
     struct PublicKey {
         bytes32 X;
         bytes32 Y;
     }
 
-    IEntryPoint public immutable entryPoint;
+    IEntryPoint public immutable entryPoint; // Marked immutable for gas efficiency
     PublicKey public publicKey;
 
-    event SimpleAccountInitialized(
-        IEntryPoint indexed entryPoint,
-        bytes32[2] pubKey
-    );
+    event SimpleAccountInitialized(IEntryPoint indexed entryPoint, bytes32[2] pubKey);
     event EtherReceived(address indexed sender, uint256 amount);
     event AccountUpgraded(address indexed proxy, address newImplementation);
     event ERC20Transferred(address indexed token, address indexed to, uint256 amount);
+    event FundsRefunded(address indexed recipient, uint256 amount);
 
     uint256 private constant _SIG_VALIDATION_FAILED = 1;
 
@@ -52,9 +52,7 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271, Re
         _disableInitializers();
     }
 
-    function initialize(
-        bytes32[2] memory aPublicKey
-    ) public virtual initializer {
+    function initialize(bytes32[2] memory aPublicKey) public initializer {
         require(aPublicKey[0] != bytes32(0) && aPublicKey[1] != bytes32(0), "Invalid public key");
         publicKey = PublicKey(aPublicKey[0], aPublicKey[1]);
         emit SimpleAccountInitialized(entryPoint, [publicKey.X, publicKey.Y]);
@@ -68,7 +66,6 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271, Re
         emit EtherReceived(msg.sender, msg.value);
     }
 
-    /// Execute multiple transactions atomically.
     function executeBatch(Call[] calldata calls) external onlyEntryPoint {
         for (uint256 i = 0; i < calls.length; i++) {
             _call(calls[i].dest, calls[i].value, calls[i].data);
@@ -85,7 +82,7 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271, Re
             WebAuthn.verifySignature({
                 challenge: message,
                 authenticatorData: sig.authenticatorData,
-                requireUserVerification: false,
+                requireUserVerification: true, // Enforcing user verification for enhanced security
                 clientDataJSON: sig.clientDataJSON,
                 challengeLocation: sig.challengeLocation,
                 responseTypeLocation: sig.responseTypeLocation,
@@ -101,7 +98,7 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271, Re
         bytes calldata signature
     ) external view override returns (bytes4 magicValue) {
         if (_validateSignature(abi.encodePacked(message), signature)) {
-            return IERC1271(this).isValidSignature.selector;
+            return IERC1271.isValidSignature.selector;
         }
         return 0xffffffff;
     }
@@ -122,7 +119,7 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271, Re
             if (sigLength < 7) return _SIG_VALIDATION_FAILED;
             uint48 validUntil = uint48(bytes6(userOp.signature[1:7]));
 
-            signature = userOp.signature[7:]; // keySlot, signature
+            signature = userOp.signature[7:];
             messageToVerify = abi.encodePacked(version, validUntil, userOpHash);
             returnIfValid.validUntil = validUntil;
         } else {
@@ -136,6 +133,7 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271, Re
     }
 
     function _call(address target, uint256 value, bytes memory data) internal {
+        require(target.isContract(), "Target must be a contract"); // Ensure target is a contract
         (bool success, bytes memory result) = target.call{value: value}(data);
         if (!success) {
             assembly {
@@ -148,26 +146,16 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271, Re
         UserOperation calldata userOp,
         bytes32 userOpHash,
         uint256 missingAccountFunds
-    )
-        external
-        virtual
-        override
-        onlyEntryPoint
-        returns (uint256 validationData)
-    {
-        // Note: `forge coverage` incorrectly marks this function and downstream
-        // as non-covered.
+    ) external override onlyEntryPoint returns (uint256 validationData) {
         validationData = _validateUserOpSignature(userOp, userOpHash);
         _payPrefund(missingAccountFunds);
     }
 
-    function _payPrefund(uint256 missingAccountFunds) private {
+    function _payPrefund(uint256 missingAccountFunds) private nonReentrant { // Added reentrancy guard
         if (missingAccountFunds != 0) {
-            (bool success, ) = payable(msg.sender).call{
-                value: missingAccountFunds,
-                gas: type(uint256).max
-            }("");
-            (success); // no-op; silence unused variable warning
+            (bool success, ) = payable(msg.sender).call{value: missingAccountFunds}("");
+            require(success, "Prefund transfer failed");
+            emit FundsRefunded(msg.sender, missingAccountFunds); // Added event emission
         }
     }
 
@@ -181,14 +169,10 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271, Re
         _;
     }
 
-    /// UUPSUpsgradeable: only allow self-upgrade.
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal view override onlySelf {
-        (newImplementation); // No-op; silence unused parameter warning
+    function _authorizeUpgrade(address newImplementation) internal view override onlySelf {
+        require(newImplementation != address(0), "New implementation cannot be zero address");
     }
 
-    /// Transfer ERC20 tokens
     function transferERC20(
         address token,
         address to,
@@ -198,10 +182,7 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271, Re
         emit ERC20Transferred(token, to, amount);
     }
 
-    function upgradeAccount(
-        address proxy,
-        address payable newImplementation
-    ) external onlyEntryPoint {
+    function upgradeAccount(address proxy, address payable newImplementation) external onlyEntryPoint {
         UUPSUpgradeable(proxy).upgradeTo(newImplementation);
         emit AccountUpgraded(proxy, newImplementation);
     }
