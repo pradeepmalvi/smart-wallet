@@ -14,8 +14,6 @@ export async function POST(req: Request) {
     pubKey: [Hex, Hex];
     chain: string;
   };
-
-  console.log( { id, pubKey, chain })
   
 
   const privateKey = process.env.RELAYER_PRIVATE_KEY;
@@ -35,13 +33,10 @@ export async function POST(req: Request) {
     args: [BigInt(id)],
   });
 
-  console.log('here0', user)
-
   if (user.account !== zeroAddress) {
     return Response?.json({ error: "User already exists" });
   }
-
-  console.log('here1')
+  
   await walletClient.writeContract({
     address: factoryContract as Hex,
     abi: FACTORY_ABI,
@@ -49,7 +44,6 @@ export async function POST(req: Request) {
     args: [BigInt(id), pubKey],
   });
 
-  console.log('here2')
 
   const smartWalletAddress = await getPublicClient(chain).readContract({
     address: factoryContract as Hex,
@@ -57,8 +51,6 @@ export async function POST(req: Request) {
     functionName: "getAddress",
     args: [pubKey],
   });
-
-  console.log('here3', smartWalletAddress)
 
   await walletClient.sendTransaction({
     to: smartWalletAddress,

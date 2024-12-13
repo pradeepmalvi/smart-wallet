@@ -30,8 +30,10 @@ import {
   FACTORY_ABI,
   getChainFromLocalStorage,
   getFactoryContract,
+  getPimlicoRpcEndpoint,
   getTransportFromLocalStorage,
 } from "@/constants";
+import { smartWallet } from "@/libs/smart-wallet";
 
 
 export class UserOpBuilder {
@@ -84,7 +86,7 @@ export class UserOpBuilder {
     maxPriorityFeePerGas: bigint;
     keyId: Hex;
     transferType?: string;
-  }): Promise<UserOperationAsHex> {
+  }): Promise<any> {
     // calculate smart wallet address via Factory contract to know the sender
     const { account, publicKey } = await this._calculateSmartWalletAddress(keyId); // the keyId is the id tied to the user's public key
     // get bytecode
@@ -120,6 +122,8 @@ export class UserOpBuilder {
       nonce,
       initCode,
       callData,
+      // maxFeePerGas: BigInt(maxFeePerGas) +  BigInt(maxFeePerGas) +  BigInt(maxPriorityFeePerGas) ,
+      // maxPriorityFeePerGas: maxFeePerGas,
       maxFeePerGas: BigInt(maxGas.maxFeePerGas),
       maxPriorityFeePerGas: BigInt(maxGas.maxPriorityFeePerGas),
     };
@@ -130,7 +134,7 @@ export class UserOpBuilder {
     // userOp.preVerificationGas = BigInt(preVerificationGas) * BigInt(10);
     // userOp.verificationGasLimit = BigInt(verificationGasLimit) + BigInt(150_000) + BigInt(initCodeGas) + BigInt(1_000_000);
 
-
+    
     // With Pimlico
     const { callGasLimit, verificationGasLimit, preVerificationGas } = await this._estimateUserOperationGas(this.toParams(userOp));
     userOp.callGasLimit = BigInt(callGasLimit)
@@ -174,6 +178,11 @@ export class UserOpBuilder {
   }
 
   private async _pimlico_getUserOperationGasPrice() {
+    const selectedChain = localStorage.getItem("chain");
+    if (!selectedChain) {
+      throw new Error("Selected chain is not available in local storage");
+    }
+
     const options = {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
@@ -187,7 +196,7 @@ export class UserOpBuilder {
 
     try {
       const response = await fetch(
-        "https://api.pimlico.io/v2/11155111/rpc?apikey=pim_NECPie9FQeZ6EvcURWLTHH",
+        getPimlicoRpcEndpoint(selectedChain) as string,
         options,
       );
       const data = await response.json();
@@ -199,6 +208,11 @@ export class UserOpBuilder {
   }
 
   private async _estimateUserOperationGas(userOp: any) {
+    const selectedChain = localStorage.getItem("chain");
+    if (!selectedChain) {
+      throw new Error("Selected chain is not available in local storage");
+    }
+
     const options = {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
@@ -212,7 +226,7 @@ export class UserOpBuilder {
 
     try {
       const response = await fetch(
-        "https://api.pimlico.io/v2/11155111/rpc?apikey=pim_NECPie9FQeZ6EvcURWLTHH",
+        getPimlicoRpcEndpoint(selectedChain) as string,
         options,
       );
       const data = await response.json();
@@ -224,6 +238,11 @@ export class UserOpBuilder {
   }
 
   private async _sendUserOperation(userOp: UserOperation) {
+    const selectedChain = localStorage.getItem("chain");
+    if (!selectedChain) {
+      throw new Error("Selected chain is not available in local storage");
+    }
+
     const options = {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
@@ -237,7 +256,7 @@ export class UserOpBuilder {
 
     try {
       const response = await fetch(
-        "https://api.pimlico.io/v2/11155111/rpc?apikey=pim_NECPie9FQeZ6EvcURWLTHH",
+        getPimlicoRpcEndpoint(selectedChain) as string,
         options,
       );
       const data = await response.json();
@@ -249,6 +268,11 @@ export class UserOpBuilder {
   }
 
   private async _getUserOperationReceipt(hash: UserOperation) {
+    const selectedChain = localStorage.getItem("chain");
+    if (!selectedChain) {
+      throw new Error("Selected chain is not available in local storage");
+    }
+
     const options = {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
@@ -262,7 +286,7 @@ export class UserOpBuilder {
 
     try {
       const response = await fetch(
-        "https://api.pimlico.io/v2/11155111/rpc?apikey=pim_NECPie9FQeZ6EvcURWLTHH",
+        getPimlicoRpcEndpoint(selectedChain) as string,
         options,
       );
       const data = await response.json();

@@ -58,7 +58,6 @@ class SmartWallet {
   }
 
   public async sendUserOperation(args: { userOp: UserOperationAsHex }): Promise<`0x${string}`> {
-    debugger
     this._isInit();
     return await this._client!.sendUserOperation({
       ...args,
