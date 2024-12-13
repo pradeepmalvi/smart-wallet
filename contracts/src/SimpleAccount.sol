@@ -11,6 +11,7 @@ import "openzeppelin-contracts/contracts/interfaces/IERC1271.sol";
 import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 struct Signature {
     bytes authenticatorData;
@@ -27,7 +28,7 @@ struct Call {
     bytes data;
 }
 
-contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271 {
+contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271, ReentrancyGuard {
     struct PublicKey {
         bytes32 X;
         bytes32 Y;
@@ -40,9 +41,10 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271 {
         IEntryPoint indexed entryPoint,
         bytes32[2] pubKey
     );
+    event EtherReceived(address indexed sender, uint256 amount);
+    event AccountUpgraded(address indexed proxy, address newImplementation);
+    event ERC20Transferred(address indexed token, address indexed to, uint256 amount);
 
-    // Return value in case of signature failure, with no time-range.
-    // Equivalent to _packValidationData(true,0,0)
     uint256 private constant _SIG_VALIDATION_FAILED = 1;
 
     constructor(IEntryPoint _entryPoint) {
@@ -50,31 +52,20 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271 {
         _disableInitializers();
     }
 
-    /**
-     * @dev The _entryPoint member is immutable, to reduce gas consumption. To upgrade EntryPoint,
-     * a new implementation of SimpleAccount must be deployed with the new EntryPoint address, then upgrading
-     * the implementation by calling `upgradeTo()`
-     */
     function initialize(
         bytes32[2] memory aPublicKey
     ) public virtual initializer {
-        _initialize(aPublicKey);
-    }
-
-    function _initialize(bytes32[2] memory aPublicKey) internal virtual {
+        require(aPublicKey[0] != bytes32(0) && aPublicKey[1] != bytes32(0), "Invalid public key");
         publicKey = PublicKey(aPublicKey[0], aPublicKey[1]);
         emit SimpleAccountInitialized(entryPoint, [publicKey.X, publicKey.Y]);
     }
 
-    // solhint-disable-next-line no-empty-blocks
-    receive() external payable {}
+    receive() external payable {
+        emit EtherReceived(msg.sender, msg.value);
+    }
 
-    // solhint-disable-next-line no-empty-blocks
-    fallback() external payable {}
-
-    function _onlyOwner() internal view {
-        //directly through the account itself (which gets redirected through execute())
-        require(msg.sender == address(this), "only account itself can call");
+    fallback() external payable {
+        emit EtherReceived(msg.sender, msg.value);
     }
 
     /// Execute multiple transactions atomically.
@@ -202,12 +193,16 @@ contract SimpleAccount is IAccount, UUPSUpgradeable, Initializable, IERC1271 {
         address token,
         address to,
         uint256 amount
-    ) external onlyEntryPoint {
+    ) external nonReentrant onlyEntryPoint {
         require(IERC20(token).transfer(to, amount), "Transfer failed");
+        emit ERC20Transferred(token, to, amount);
     }
 
-    function upgradeAccount(address proxy, address payable newImplementation) external onlyEntryPoint{
-        // Upgrade the implementation of the given proxy
+    function upgradeAccount(
+        address proxy,
+        address payable newImplementation
+    ) external onlyEntryPoint {
         UUPSUpgradeable(proxy).upgradeTo(newImplementation);
+        emit AccountUpgraded(proxy, newImplementation);
     }
 }

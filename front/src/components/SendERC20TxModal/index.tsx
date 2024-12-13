@@ -134,7 +134,7 @@ export default function SendTokenTxModal({
       if (!builder) {
         throw new Error("Builder is not initialized");
       }
-      debugger
+
       const hash = await builder.buildUserOp({
         calls: {
           token: token as Hex,

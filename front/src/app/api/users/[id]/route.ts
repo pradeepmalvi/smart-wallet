@@ -17,16 +17,12 @@ export async function GET(_req: Request, { params }: { params: { id: Hex } }) {
 
   const contractAddress = getFactoryContract(chain);
 
-  console.log('id', id)
-  console.log('BigInt', [BigInt(id)])
   const user = await getPublicClient(chain).readContract({
     address: contractAddress as `0x${string}`,
     abi: FACTORY_ABI,
     functionName: "getUser",
     args: [BigInt(id)],
   });
-
-  console.log('user', user)
 
   let balance = BigInt(0);
   

@@ -6,6 +6,7 @@ import {
   bscTestnet,
   arbitrumSepolia,
   optimismSepolia,
+  baseSepolia
 } from "viem/chains";
 
 export const allNetwork = [
@@ -17,7 +18,8 @@ export const allNetwork = [
     decimals: 18,
     chainId: 1,
     chain: sepolia,
-    rpc: process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM,
+    rpcAlchemy: process.env.NEXT_PUBLIC_ALCHEMY_RPC_ENDPOINT_ETHEREUM,
+    rpcPimlico: process.env.NEXT_PUBLIC_PIMLICO_RPC_ENDPOINT_ETHEREUM,
     factoryContract: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_ETHEREUM,
     explorerKey: process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY_ETHEREUM,
     explorerUrl: process.env.NEXT_PUBLIC_ETHERSCAN_URL_ETHEREUM,
@@ -33,7 +35,8 @@ export const allNetwork = [
     decimals: 18,
     chainId: 137,
     chain: polygonAmoy,
-    rpc: process.env.NEXT_PUBLIC_RPC_ENDPOINT_POLYGON,
+    rpcAlchemy: process.env.NEXT_PUBLIC_ALCHEMY_RPC_ENDPOINT_POLYGON,
+    rpcPimlico: process.env.NEXT_PUBLIC_PIMLICO_RPC_ENDPOINT_POLYGON,
     factoryContract: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_POLYGON,
     explorerKey: process.env.NEXT_PUBLIC_POLYGONSCAN_API_KEY_POLYGON,
     explorerUrl: process.env.NEXT_PUBLIC_POLYGONSCAN_URL_POLYGON,
@@ -49,7 +52,8 @@ export const allNetwork = [
   //   decimals: 18,
   //   chainId: 56,
   //   chain: bscTestnet,
-  //   rpc: process.env.NEXT_PUBLIC_RPC_ENDPOINT_BINANCE,
+  //   rpcAlchemy: process.env.NEXT_PUBLIC_ALCHEMY_RPC_ENDPOINT_BINANCE,
+  //   rpcPimlico: process.env.NEXT_PUBLIC_PIMLICO_RPC_ENDPOINT_BINANCE,
   //   factoryContract: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_BINANCE,
   //   explorerKey: process.env.NEXT_PUBLIC_BINANCESCAN_API_KEY_BINANCE,
   //   explorerUrl: process.env.NEXT_PUBLIC_BINANCESCAN_URL_BINANCE,
@@ -64,13 +68,14 @@ export const allNetwork = [
     decimals: 18,
     chainId: 42161,
     chain: arbitrumSepolia,
-    rpc: process.env.NEXT_PUBLIC_RPC_ENDPOINT_ARBITRUM,
+    rpcAlchemy: process.env.NEXT_PUBLIC_ALCHEMY_RPC_ENDPOINT_ARBITRUM,
+    rpcPimlico: process.env.NEXT_PUBLIC_PIMLICO_RPC_ENDPOINT_ARBITRUM,
     factoryContract: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_ARBITRUM,
     explorerKey: process.env.NEXT_PUBLIC_ARBITRUMSCAN_API_KEY_ARBITRUM,
     explorerUrl: process.env.NEXT_PUBLIC_ARBITRUMSCAN_URL_ARBITRUM,
     explorerApiUrl: process.env.NEXT_PUBLIC_ARBITRUMSCAN_API_URL_ARBITRUM,
     getBalance: (address: string) =>
-      `${process.env.NEXT_PUBLIC_ARBITRUMSCAN_API_URL_ARBITRUM}?module=account&action=balance&address=${address}&tag=latest&apikey=${process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY_ARBITRUM}`,
+      `${process.env.NEXT_PUBLIC_ARBITRUMSCAN_API_URL_ARBITRUM}?module=account&action=balance&address=${address}&tag=latest&apikey=${process.env.NEXT_PUBLIC_ARBITRUMSCAN_API_KEY_ARBITRUM}`,
   },
   {
     name: "Optimism",
@@ -80,13 +85,31 @@ export const allNetwork = [
     decimals: 18,
     chainId: 10,
     chain: optimismSepolia,
-    rpc: process.env.NEXT_PUBLIC_RPC_ENDPOINT_OPTIMISM,
+    rpcAlchemy: process.env.NEXT_PUBLIC_ALCHEMY_RPC_ENDPOINT_OPTIMISM,
+    rpcPimlico: process.env.NEXT_PUBLIC_PIMLICO_RPC_ENDPOINT_OPTIMISM,
     factoryContract: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_OPTIMISM,
     explorerKey: process.env.NEXT_PUBLIC_OPTIMISMSCAN_API_KEY_OPTIMISM,
     explorerUrl: process.env.NEXT_PUBLIC_OPTIMISMSCAN_URL_OPTIMISM,
     explorerApiUrl: process.env.NEXT_PUBLIC_OPTIMISMSCAN_API_URL_OPTIMISM,
     getBalance: (address: string) =>
-      `${process.env.NEXT_PUBLIC_OPTIMISMSCAN_API_URL_OPTIMISM}?module=account&action=balance&address=${address}&tag=latest&apikey=${process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY_OPTIMISM}`,
+      `${process.env.NEXT_PUBLIC_OPTIMISMSCAN_API_URL_OPTIMISM}?module=account&action=balance&address=${address}&tag=latest&apikey=${process.env.NEXT_PUBLIC_OPTIMISMSCAN_API_KEY_OPTIMISM}`,
+  },
+  {
+    name: "Base",
+    testnet: "Sepolia",
+    explorerName: "Base Sepolia",
+    nativeToken: "ETH",
+    decimals: 18,
+    chainId: 10,
+    chain: baseSepolia,
+    rpcAlchemy: process.env.NEXT_PUBLIC_ALCHEMY_RPC_ENDPOINT_BASE,
+    rpcPimlico: process.env.NEXT_PUBLIC_PIMLICO_RPC_ENDPOINT_BASE,
+    factoryContract: process.env.NEXT_PUBLIC_FACTORY_CONTRACT_ADDRESS_BASE,
+    explorerKey: process.env.NEXT_PUBLIC_BASESCAN_API_KEY_BASE,
+    explorerUrl: process.env.NEXT_PUBLIC_BASESCAN_URL_BASE,
+    explorerApiUrl: process.env.NEXT_PUBLIC_BASESCAN_API_URL_BASE,
+    getBalance: (address: string) =>
+      `${process.env.NEXT_PUBLIC_BASESCAN_API_URL_BASE}?module=account&action=balance&address=${address}&tag=latest&apikey=${process.env.NEXT_PUBLIC_BASESCAN_API_KEY_BASE}`,
   },
 ];
 
@@ -112,7 +135,12 @@ export const getFactoryContract = (chain: string) => {
 
 export const getRpcEndpoint = (chain: string) => {
   const network = allNetwork.find((network) => network.name === chain);
-  return http(network?.rpc || process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM);
+  return http(network?.rpcAlchemy || process.env.NEXT_PUBLIC_ALCHEMY_RPC_ENDPOINT_ETHEREUM);
+};
+
+export const getPimlicoRpcEndpoint = (chain: string) => {
+  const network = allNetwork.find((network) => network.name === chain);
+  return network?.rpcPimlico || process.env.NEXT_PUBLIC_PIMLICO_RPC_ENDPOINT_ETHEREUM
 };
 
 export const getChainFromLocalStorage = (chain: string) => {
@@ -142,7 +170,7 @@ export const getBalance = (chain: string, address: string) => {
 
 export const getTransportFromLocalStorage = (chain: string) => {
   const network = allNetwork.find((network) => network.name === chain);
-  return http(network?.rpc || process.env.NEXT_PUBLIC_RPC_ENDPOINT_ETHEREUM);
+  return http(network?.rpcAlchemy || process.env.NEXT_PUBLIC_ALCHEMY_RPC_ENDPOINT_ETHEREUM);
 };
 
 export const getPublicClient = (chain: string) => {
