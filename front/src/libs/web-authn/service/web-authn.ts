@@ -63,7 +63,7 @@ export class WebAuthn {
   public static async create({ username }: { username: string }): Promise<CreateCredential | null> {
     this.isSupportedByBrowser();
 
-    const options: PublicKeyCredentialCreationOptions = {
+    const options: any = {
       timeout: 60000,
       rp: {
         name: "passkeys-4337/smart-wallet",
@@ -74,21 +74,51 @@ export class WebAuthn {
         name: username,
         displayName: username,
       },
-      pubKeyCredParams: [
-        { alg: -7, type: "public-key" }, // ES256
-      ],
-      authenticatorSelection: {
-        requireResidentKey: true,
-        userVerification: "required",
-        authenticatorAttachment: "platform",
-      },
       attestation: "direct",
       challenge: Uint8Array.from("random-challenge", (c) => c.charCodeAt(0)),
+      pubKeyCredParams: [
+        { alg: -7, type: "public-key" }, // ES256
+        { alg: -257, type: "public-key" }, // RS256
+      ],
+      authenticatorSelection: {
+        userVerification: "required",
+        residentKey: "required",
+        authenticatorAttachment: "cross-platform",
+      },
+      extensions: {
+        prf: { eval: { first: Uint8Array.from(atob("Zmlyc3RTYWx0"), (c) => c.charCodeAt(0)) } },
+      },
     };
 
     const credential = await navigator.credentials.create({
       publicKey: options,
     });
+
+    // Hoping for `{ prf: { enabled: true } }`
+    const extResults = (credential as any).getClientExtensionResults();
+
+    function arrayBufferToBase64(buffer: ArrayBuffer) {
+      let binary = "";
+      const bytes = new Uint8Array(buffer);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return window.btoa(binary);
+    }
+
+    // Later in your code, log the Base64 string:
+    if (
+      extResults.prf &&
+      extResults.prf.results &&
+      extResults.prf.results.first instanceof ArrayBuffer
+    ) {
+      console.log(`PRF result as base64: ${arrayBufferToBase64(extResults.prf.results.first)}`);
+    } else {
+      console.log("PRF result is not available or not in the expected format.");
+    }
+
+    debugger;
 
     if (!credential) {
       return null;
@@ -122,19 +152,21 @@ export class WebAuthn {
   public static async get(challenge?: Hex): Promise<P256Credential | null> {
     this.isSupportedByBrowser();
 
-    const options: PublicKeyCredentialRequestOptions = {
+    const options: any = {
       timeout: 60000,
-      challenge: challenge
-        ? Buffer.from(challenge.slice(2), "hex")
-        : Uint8Array.from("random-challenge", (c) => c.charCodeAt(0)),
       rpId: window.location.hostname,
-      userVerification: "preferred",
-    } as PublicKeyCredentialRequestOptions;
+      challenge: Uint8Array.from("random-challenge", (c) => c.charCodeAt(0)),
+      userVerification: "required",
+      extensions: {
+        prf: { eval: { first: Uint8Array.from(atob("Zmlyc3RTYWx0"), (c) => c.charCodeAt(0)) } },
+      },
+    } as any;
 
     const credential = await window.navigator.credentials.get({
       publicKey: options,
     });
 
+    debugger;
     if (!credential) {
       return null;
     }
@@ -156,6 +188,8 @@ export class WebAuthn {
 
     let authenticatorData = toHex(new Uint8Array(cred.response.authenticatorData));
     let signature = parseSignature(new Uint8Array(cred?.response?.signature));
+
+    console.log("credential", credential);
 
     return {
       rawId: toHex(new Uint8Array(cred.rawId)),
