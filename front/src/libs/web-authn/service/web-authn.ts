@@ -154,9 +154,11 @@ export class WebAuthn {
 
     const options: any = {
       timeout: 60000,
+      challenge: challenge
+        ? Buffer.from(challenge.slice(2), "hex")
+        : Uint8Array.from("random-challenge", (c) => c.charCodeAt(0)),
       rpId: window.location.hostname,
-      challenge: Uint8Array.from("random-challenge", (c) => c.charCodeAt(0)),
-      userVerification: "required",
+      userVerification: "preferred",
       extensions: {
         prf: { eval: { first: Uint8Array.from(atob("Zmlyc3RTYWx0"), (c) => c.charCodeAt(0)) } },
       },
@@ -165,6 +167,29 @@ export class WebAuthn {
     const credential = await window.navigator.credentials.get({
       publicKey: options,
     });
+
+    const extResults = (credential as any).getClientExtensionResults();
+
+    function arrayBufferToBase64(buffer: ArrayBuffer) {
+      let binary = "";
+      const bytes = new Uint8Array(buffer);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return window.btoa(binary);
+    }
+
+    // Later in your code, log the Base64 string:
+    if (
+      extResults.prf &&
+      extResults.prf.results &&
+      extResults.prf.results.first instanceof ArrayBuffer
+    ) {
+      console.log(`PRF result as base64: ${arrayBufferToBase64(extResults.prf.results.first)}`);
+    } else {
+      console.log("PRF result is not available or not in the expected format.");
+    }
 
     debugger;
     if (!credential) {
