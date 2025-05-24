@@ -3,7 +3,8 @@
         "apps": [
             "CAQ757V6Q3.com.wrx.wazirx.stage",
       	    "SXKNM4QXT9.com.codigami.justunfollow-stage",
-	    "SXKNM4QXT9.com.project.n.stage"
+	        "SXKNM4QXT9.com.project.n.stage",
+            "SXKNM4QXT9.com.project.n.prod"
         ]
     }
 }
