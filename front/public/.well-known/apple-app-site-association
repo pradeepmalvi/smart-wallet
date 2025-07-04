@@ -5,6 +5,7 @@
       	    "SXKNM4QXT9.com.codigami.justunfollow-stage",
 	        "SXKNM4QXT9.com.project.n.stage",
             "SXKNM4QXT9.com.project.n.prod"
-        ]
+        ],
+        "sites": ["https://smart-wallet-beryl.vercel.app/", "https://smart-wallet-pradeepmalvis-projects.vercel.app/"]
     }
 }
