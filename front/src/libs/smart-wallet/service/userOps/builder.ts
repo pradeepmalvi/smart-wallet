@@ -33,8 +33,6 @@ import {
   getPimlicoRpcEndpoint,
   getTransportFromLocalStorage,
 } from "@/constants";
-import { smartWallet } from "@/libs/smart-wallet";
-
 
 export class UserOpBuilder {
   public relayer: Hex = "0x061060a65146b3265C62fC8f3AE977c9B27260fF";
@@ -46,11 +44,9 @@ export class UserOpBuilder {
   constructor(chain: Chain) {
     this.chain = chain;
     const selectedChain = localStorage.getItem("chain");
-    const factoryContractAddress = getFactoryContract(selectedChain as string);
+    if (!selectedChain) throw new Error("Selected chain is not available in local storage");
 
-    if (!selectedChain) {
-      throw new Error("Selected chain is not available in local storage");
-    }
+    const factoryContractAddress = getFactoryContract(selectedChain as string);
 
     this.publicClient = createPublicClient({
       chain: getChainFromLocalStorage(selectedChain),
@@ -64,16 +60,15 @@ export class UserOpBuilder {
     });
 
     this.factoryContract = getContract({
-      address: factoryContractAddress as Hex, // only on Sepolia
+      address: factoryContractAddress as Hex,
       abi: FACTORY_ABI,
-      client: {
-        wallet: walletClient,
-        public: this.publicClient,
-      },
+      client: { wallet: walletClient, public: this.publicClient },
     });
   }
 
-  // reference: https://ethereum.stackexchange.com/questions/150796/how-to-create-a-raw-erc-4337-useroperation-from-scratch-and-then-send-it-to-bund
+  /**
+   * Build a complete UserOperation and send it to the bundler/relayer.
+   */
   async buildUserOp({
     calls,
     maxFeePerGas,
@@ -87,80 +82,67 @@ export class UserOpBuilder {
     keyId: Hex;
     transferType?: string;
   }): Promise<any> {
-    // calculate smart wallet address via Factory contract to know the sender
-    const { account, publicKey } = await this._calculateSmartWalletAddress(keyId); // the keyId is the id tied to the user's public key
-    // get bytecode
-    const bytecode = await this.publicClient.getBytecode({
-      address: account,
-    });
+    // calculate smart wallet address via Factory contract
+    const { account, publicKey } = await this._calculateSmartWalletAddress(keyId);
 
-    let initCode = toHex(new Uint8Array(0));
-    let initCodeGas = BigInt(0);
+    // check if wallet bytecode exists (wallet already deployed)
+    const bytecode = await this.publicClient.getBytecode({ address: account });
+
+    let initCode: Hex = toHex(new Uint8Array(0));
+    let initCodeGas: bigint = BigInt(0);
     if (bytecode === undefined) {
-      // smart wallet does NOT already exists
-      // calculate initCode and initCodeGas
-      ({ initCode, initCodeGas } = await this._createInitCode(publicKey));
+      const created = await this._createInitCode(publicKey);
+      initCode = created.initCode;
+      initCodeGas = created.initCodeGas;
     }
 
-    // calculate nonce
     const nonce = await this._getNonce(account);
 
-    let callData;
-    if (transferType === "Token" && !Array.isArray(calls)) {
-      callData = this._addCallTokenData(calls as TokenCall);
-    } else {
-      callData = this._addCallData(calls as NativeCall[]);
-      // callData = this._addCallDataForUpgrade("0x917aF1dc43cD6F617653C3BC94d633aC2859A4F9", "0xb67698AF4cC9880AdaedE3b8D65c7ac55fb2732f" as any);
-    }
+    const callData =
+      transferType === "Token" && !Array.isArray(calls)
+        ? this._addCallTokenData(calls as TokenCall)
+        : this._addCallData(calls as NativeCall[]);
 
-    const maxGas = await this._pimlico_getUserOperationGasPrice()
+    const maxGas = await this._pimlico_getUserOperationGasPrice();
 
-    // create user operation
     const userOp: UserOperation = {
       ...DEFAULT_USER_OP,
       sender: account,
       nonce,
       initCode,
       callData,
-      // maxFeePerGas: BigInt(maxFeePerGas) +  BigInt(maxFeePerGas) +  BigInt(maxPriorityFeePerGas) ,
-      // maxPriorityFeePerGas: maxFeePerGas,
       maxFeePerGas: BigInt(maxGas.maxFeePerGas),
       maxPriorityFeePerGas: BigInt(maxGas.maxPriorityFeePerGas),
     };
 
-    // With alchemy
-    // const { callGasLimit, verificationGasLimit, preVerificationGas } = await smartWallet.estimateUserOperationGas({ userOp: this.toParams(userOp)});
-    // userOp.callGasLimit = BigInt(callGasLimit);
-    // userOp.preVerificationGas = BigInt(preVerificationGas) * BigInt(10);
-    // userOp.verificationGasLimit = BigInt(verificationGasLimit) + BigInt(150_000) + BigInt(initCodeGas) + BigInt(1_000_000);
+    // get paymaster stub data (Pimlico flow)
+    const paymasterStub = await this._pimlico_getPaymasterStubData(this.toParamsForPaymasterStubData(userOp));
 
-    
-    // With Pimlico
-    const { callGasLimit, verificationGasLimit, preVerificationGas } = await this._estimateUserOperationGas(this.toParams(userOp));
-    userOp.callGasLimit = BigInt(callGasLimit)
-    userOp.preVerificationGas = BigInt(preVerificationGas) * BigInt(2)
-    userOp.verificationGasLimit = BigInt(verificationGasLimit) + BigInt(150_000) + BigInt(initCodeGas) + BigInt(1_000_000);
+    const gasEstimates = await this._estimateUserOperationGas(
+      this.toParams({ ...userOp, paymasterAndData: paymasterStub.paymasterAndData }),
+    );
 
+    userOp.callGasLimit = BigInt(gasEstimates.callGasLimit);
+    userOp.preVerificationGas = BigInt(gasEstimates.preVerificationGas) * BigInt(2);
+    userOp.verificationGasLimit =
+      BigInt(gasEstimates.verificationGasLimit) + BigInt(150_000) + BigInt(initCodeGas) + BigInt(1_000_000);
+    userOp.paymasterAndData = paymasterStub.paymasterAndData;
 
-    // get userOp hash (with signature == 0x) by calling the entry point contract
-    const userOpHash = await this._getUserOpHash(userOp);
+    // get final paymaster data
+    const pmData = await this._pimlico_getPaymasterData(this.toParamsForPaymaster({ ...userOp }));
 
-    // version = 1 and validUntil = 0 in msgToSign are hardcoded
+    // compute userOp hash and sign
+    const userOpHash = await this._getUserOpHash({ ...userOp, paymasterAndData: pmData.paymasterAndData });
     const msgToSign = encodePacked(["uint8", "uint48", "bytes32"], [1, 0, userOpHash]);
-
-    // get signature from webauthn
     const signature = await this.getSignature(msgToSign, keyId);
 
-    const _userOpFinal = this.toParams({ ...userOp, signature });
-    // With alchemy
-    // const hash = await smartWallet.sendUserOperation({ userOp: _userOpFinal });
+    const userOpFinal = this.toParams({ ...userOp, paymasterAndData: pmData.paymasterAndData, signature });
 
-    // With Pimlico
-    const hash = await this._sendUserOperation(_userOpFinal);
-
+    const hash = await this._sendUserOperation(userOpFinal);
     return hash;
   }
 
+  /** Convert UserOperation fields to hex-encoded params */
   public toParams(op: UserOperation): UserOperationAsHex {
     return {
       sender: op.sender,
@@ -169,66 +151,59 @@ export class UserOpBuilder {
       callData: op.callData,
       callGasLimit: toHex(op.callGasLimit),
       verificationGasLimit: toHex(op.verificationGasLimit),
-      preVerificationGas:  toHex(op.preVerificationGas),
-      maxFeePerGas:  toHex(op.maxFeePerGas),
-      maxPriorityFeePerGas:  toHex(op.maxPriorityFeePerGas),
-      paymasterAndData: op.paymasterAndData === zeroAddress ? "0x" : op.paymasterAndData,
+      preVerificationGas: toHex(op.preVerificationGas),
+      maxFeePerGas: toHex(op.maxFeePerGas),
+      maxPriorityFeePerGas: toHex(op.maxPriorityFeePerGas),
+      paymasterAndData: op.paymasterAndData,
       signature: op.signature,
     };
   }
 
+  /** Similar to toParams but ensures paymasterAndData is not an empty zeroAddress */
+  public toParamsForPaymaster(op: UserOperation): UserOperationAsHex {
+    return {
+      ...this.toParams(op),
+      paymasterAndData: op.paymasterAndData === zeroAddress ? "0x" : op.paymasterAndData,
+    };
+  }
+
+  public toParamsForPaymasterStubData(op: UserOperation): UserOperationAsHex {
+    return this.toParamsForPaymaster(op);
+  }
+
+  /* --------------------- Pimlico / RPC helpers --------------------- */
   private async _pimlico_getUserOperationGasPrice() {
     const selectedChain = localStorage.getItem("chain");
-    if (!selectedChain) {
-      throw new Error("Selected chain is not available in local storage");
-    }
+    if (!selectedChain) throw new Error("Selected chain is not available in local storage");
 
     const options = {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "pimlico_getUserOperationGasPrice",
-        params: [],
-      }),
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "pimlico_getUserOperationGasPrice", params: [] }),
     };
 
     try {
-      const response = await fetch(
-        getPimlicoRpcEndpoint(selectedChain) as string,
-        options,
-      );
+      const response = await fetch(getPimlicoRpcEndpoint(selectedChain) as string, options);
       const data = await response.json();
       return data.result.slow;
     } catch (err) {
       console.error(err);
-      throw new Error("Failed to estimate gas for user operation");
+      throw new Error("Failed to get user operation gas price from Pimlico");
     }
   }
 
   private async _estimateUserOperationGas(userOp: any) {
     const selectedChain = localStorage.getItem("chain");
-    if (!selectedChain) {
-      throw new Error("Selected chain is not available in local storage");
-    }
+    if (!selectedChain) throw new Error("Selected chain is not available in local storage");
 
     const options = {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "eth_estimateUserOperationGas",
-        params: [userOp, "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"],
-      }),
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_estimateUserOperationGas", params: [userOp, this.entryPoint] }),
     };
 
     try {
-      const response = await fetch(
-        getPimlicoRpcEndpoint(selectedChain) as string,
-        options,
-      );
+      const response = await fetch(getPimlicoRpcEndpoint(selectedChain) as string, options);
       const data = await response.json();
       return data.result;
     } catch (err) {
@@ -239,71 +214,109 @@ export class UserOpBuilder {
 
   private async _sendUserOperation(userOp: UserOperation) {
     const selectedChain = localStorage.getItem("chain");
-    if (!selectedChain) {
-      throw new Error("Selected chain is not available in local storage");
+    if (!selectedChain) throw new Error("Selected chain is not available in local storage");
+
+    const options = {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_sendUserOperation", params: [userOp, this.entryPoint] }),
+    };
+
+    try {
+      const response = await fetch(getPimlicoRpcEndpoint(selectedChain) as string, options);
+      const data = await response.json();
+      return data.result;
+    } catch (err) {
+      console.error(err);
+      throw new Error("Failed to send user operation");
     }
+  }
+
+  private async _pimlico_getPaymasterStubData(userOp: UserOperation) {
+    const selectedChain = localStorage.getItem("chain");
+    if (!selectedChain) throw new Error("Selected chain is not available in local storage");
 
     const options = {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
       body: JSON.stringify({
         jsonrpc: "2.0",
-        id: 1,
-        method: "eth_sendUserOperation",
-        params: [userOp, "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789"],
+        method: "pm_getPaymasterStubData",
+        id: 4337,
+        params: [
+          userOp,
+          this.entryPoint,
+          "0xaa36a7",
+          { token: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" },
+        ],
       }),
     };
 
     try {
-      const response = await fetch(
-        getPimlicoRpcEndpoint(selectedChain) as string,
-        options,
-      );
+      const response = await fetch(getPimlicoRpcEndpoint(selectedChain) as string, options);
       const data = await response.json();
       return data.result;
     } catch (err) {
       console.error(err);
-      throw new Error("Failed to send user operation");
+      throw new Error("Failed to get paymaster stub data from Pimlico");
+    }
+  }
+
+  private async _pimlico_getPaymasterData(userOp: UserOperation) {
+    const selectedChain = localStorage.getItem("chain");
+    if (!selectedChain) throw new Error("Selected chain is not available in local storage");
+
+    const options = {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "pm_getPaymasterData",
+        id: 4337,
+        params: [
+          userOp,
+          this.entryPoint,
+          "0xaa36a7",
+          { token: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238" },
+        ],
+      }),
+    };
+
+    try {
+      const response = await fetch(getPimlicoRpcEndpoint(selectedChain) as string, options);
+      const data = await response.json();
+      return data.result;
+    } catch (err) {
+      console.error(err);
+      throw new Error("Failed to get paymaster data from Pimlico");
     }
   }
 
   private async _getUserOperationReceipt(hash: UserOperation) {
     const selectedChain = localStorage.getItem("chain");
-    if (!selectedChain) {
-      throw new Error("Selected chain is not available in local storage");
-    }
+    if (!selectedChain) throw new Error("Selected chain is not available in local storage");
 
     const options = {
       method: "POST",
       headers: { accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: 1,
-        method: "eth_getUserOperationReceipt",
-        params: [hash],
-      }),
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getUserOperationReceipt", params: [hash] }),
     };
 
     try {
-      const response = await fetch(
-        getPimlicoRpcEndpoint(selectedChain) as string,
-        options,
-      );
+      const response = await fetch(getPimlicoRpcEndpoint(selectedChain) as string, options);
       const data = await response.json();
       return data.result;
     } catch (err) {
       console.error(err);
-      throw new Error("Failed to send user operation");
+      throw new Error("Failed to get user operation receipt");
     }
   }
 
+  /* --------------------- Signatures / helpers --------------------- */
   public async getSignature(msgToSign: Hex, keyId: Hex): Promise<Hex> {
     const credentials: P256Credential = (await WebAuthn.get(msgToSign)) as P256Credential;
-
     if (credentials.rawId !== keyId) {
-      throw new Error(
-        "Incorrect passkeys used for tx signing. Please sign the transaction with the correct logged-in account",
-      );
+      throw new Error("Incorrect passkeys used for tx signing. Please sign with the correct account");
     }
 
     const signature = encodePacked(
@@ -317,30 +330,12 @@ export class UserOpBuilder {
               type: "tuple",
               name: "credentials",
               components: [
-                {
-                  name: "authenticatorData",
-                  type: "bytes",
-                },
-                {
-                  name: "clientDataJSON",
-                  type: "string",
-                },
-                {
-                  name: "challengeLocation",
-                  type: "uint256",
-                },
-                {
-                  name: "responseTypeLocation",
-                  type: "uint256",
-                },
-                {
-                  name: "r",
-                  type: "bytes32",
-                },
-                {
-                  name: "s",
-                  type: "bytes32",
-                },
+                { name: "authenticatorData", type: "bytes" },
+                { name: "clientDataJSON", type: "string" },
+                { name: "challengeLocation", type: "uint256" },
+                { name: "responseTypeLocation", type: "uint256" },
+                { name: "r", type: "bytes32" },
+                { name: "s", type: "bytes32" },
               ],
             },
           ],
@@ -361,35 +356,21 @@ export class UserOpBuilder {
     return signature;
   }
 
-  private async _createInitCode(
-    pubKey: readonly [Hex, Hex],
-  ): Promise<{ initCode: Hex; initCodeGas: bigint }> {
-    let createAccountTx = encodeFunctionData({
-      abi: FACTORY_ABI,
-      functionName: "createAccount",
-      args: [pubKey],
-    });
+  private async _createInitCode(pubKey: readonly [Hex, Hex]): Promise<{ initCode: Hex; initCodeGas: bigint }> {
+    const createAccountTx = encodeFunctionData({ abi: FACTORY_ABI, functionName: "createAccount", args: [pubKey] });
 
-    let initCode = encodePacked(
-      ["address", "bytes"], // types
-      [this.factoryContract.address, createAccountTx], // values
-    );
+    const initCode = encodePacked(["address", "bytes"], [this.factoryContract.address, createAccountTx]);
 
-    let initCodeGas = await this.publicClient.estimateGas({
+    const initCodeGas = await this.publicClient.estimateGas({
       account: this.relayer,
       to: this.factoryContract.address,
       data: createAccountTx,
     });
 
-    return {
-      initCode,
-      initCodeGas,
-    };
+    return { initCode, initCodeGas };
   }
 
-  private async _calculateSmartWalletAddress(
-    id: Hex,
-  ): Promise<{ account: Address; publicKey: readonly [Hex, Hex] }> {
+  private async _calculateSmartWalletAddress(id: Hex): Promise<{ account: Address; publicKey: readonly [Hex, Hex] }> {
     const user = await this.factoryContract.read.getUser([BigInt(id)]);
     return { account: user.account, publicKey: user.publicKey };
   }
@@ -401,21 +382,9 @@ export class UserOpBuilder {
           inputs: [
             {
               components: [
-                {
-                  internalType: "address",
-                  name: "dest",
-                  type: "address",
-                },
-                {
-                  internalType: "uint256",
-                  name: "value",
-                  type: "uint256",
-                },
-                {
-                  internalType: "bytes",
-                  name: "data",
-                  type: "bytes",
-                },
+                { internalType: "address", name: "dest", type: "address" },
+                { internalType: "uint256", name: "value", type: "uint256" },
+                { internalType: "bytes", name: "data", type: "bytes" },
               ],
               internalType: "struct Call[]",
               name: "calls",
@@ -434,69 +403,60 @@ export class UserOpBuilder {
   }
 
   private _addCallTokenData(calls: TokenCall): Hex {
+    const maxUint256 = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+    const paymaster = "0x6666666666667849c56f2850848ce1c4da65c68b";
+
+    const batchedCalls = [
+      {
+        dest: calls.token,
+        value: BigInt(0),
+        data: encodeFunctionData({
+          abi: parseAbi(["function approve(address spender, uint256 amount)" ]),
+          functionName: "approve",
+          args: [paymaster, maxUint256],
+        }),
+      },
+      {
+        dest: calls.token,
+        value: BigInt(0),
+        data: encodeFunctionData({
+          abi: parseAbi(["function transfer(address to, uint256 amount) returns (bool)" ]),
+          functionName: "transfer",
+          args: [calls.to, calls.amount],
+        }),
+      },
+    ];
+
     return encodeFunctionData({
       abi: [
         {
           inputs: [
             {
-              internalType: "address",
-              name: "token",
-              type: "address",
-            },
-            {
-              internalType: "address",
-              name: "to",
-              type: "address",
-            },
-            {
-              internalType: "uint256",
-              name: "amount",
-              type: "uint256",
+              components: [
+                { name: "dest", type: "address" },
+                { name: "value", type: "uint256" },
+                { name: "data", type: "bytes" },
+              ],
+              internalType: "struct Call[]",
+              name: "calls",
+              type: "tuple[]",
             },
           ],
-          name: "transferERC20",
+          name: "executeBatch",
           outputs: [],
           stateMutability: "nonpayable",
           type: "function",
         },
       ],
-      functionName: "transferERC20",
-      args: [calls.token, calls.to, calls.amount],
+      functionName: "executeBatch",
+      args: [batchedCalls],
     });
   }
-
-
-  // private _addCallDataForUpgrade(proxy: string, newImplementation: string): Hex {
-  //   return encodeFunctionData({
-  //     abi: [
-  //       {
-  //         inputs: [
-  //           {
-  //             internalType: "address",
-  //             name: "proxy",
-  //             type: "address",
-  //           },
-  //           {
-  //             internalType: "address payable",
-  //             name: "newImplementation",
-  //             type: "address",
-  //           },
-  //         ],
-  //         name: "upgradeAccount",
-  //         outputs: [],
-  //         stateMutability: "nonpayable",
-  //         type: "function",
-  //       },
-  //     ],
-  //     functionName: "upgradeAccount",
-  //     args: [proxy, newImplementation],
-  //   });
-  // }
 
   private async _getNonce(smartWalletAddress: Hex): Promise<bigint> {
     const nonce: bigint = await this.publicClient.readContract({
       address: this.entryPoint,
-      abi: parseAbi(["function getNonce(address, uint192) view returns (uint256)"]),
+      abi: parseAbi(["function getNonce(address, uint192) view returns (uint256)" ]),
       functionName: "getNonce",
       args: [smartWalletAddress, BigInt(0)],
     });
@@ -504,15 +464,8 @@ export class UserOpBuilder {
   }
 
   private async _getUserOpHash(userOp: UserOperation): Promise<Hex> {
-    const entryPointContract = getContract({
-      address: this.entryPoint,
-      abi: ENTRYPOINT_ABI,
-      client: {
-        public: this.publicClient,
-      },
-    });
-
-    const userOpHash = entryPointContract.read.getUserOpHash([userOp]);
+    const entryPointContract = getContract({ address: this.entryPoint, abi: ENTRYPOINT_ABI, client: { public: this.publicClient } });
+    const userOpHash = await entryPointContract.read.getUserOpHash([userOp]);
     return userOpHash;
   }
 }
